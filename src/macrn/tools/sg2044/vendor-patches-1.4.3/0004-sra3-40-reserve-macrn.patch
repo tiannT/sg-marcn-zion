@@ -1,0 +1,13 @@
+diff --git a/Platform/Sophgo/SG2044Pkg/SRA3-40/SRA3-40.dsc b/Platform/Sophgo/SG2044Pkg/SRA3-40/SRA3-40.dsc
+--- a/Platform/Sophgo/SG2044Pkg/SRA3-40/SRA3-40.dsc
++++ b/Platform/Sophgo/SG2044Pkg/SRA3-40/SRA3-40.dsc
+@@ -633,6 +633,9 @@
+ 
+ # memory
+   gSophgoSG2044PlatformPkgTokenSpaceGuid.PcdMemoryBaseAddress|0x80000000
++  # Preserve the same monitor/FDT reservation used by the SG2044 candidate.
++  gSophgoTokenSpaceGuid.PcdMacrnReservedBase|0x90000000
++  gSophgoTokenSpaceGuid.PcdMacrnReservedSize|0x01020000
+   # 128G
+   gSophgoSG2044PlatformPkgTokenSpaceGuid.PcdMemorySize|0x2000000000
+ 

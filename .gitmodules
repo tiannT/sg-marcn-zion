@@ -1,0 +1,4 @@
+[submodule "linux-cvm-kernel"]
+	path = src/linux-cvm-kernel
+	url = https://github.com/gregkh/linux.git
+	shallow = true

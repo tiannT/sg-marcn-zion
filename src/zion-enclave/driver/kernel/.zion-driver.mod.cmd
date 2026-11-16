@@ -1,0 +1,1 @@
+savedcmd_/work/zion-env/zion-enclave/driver/kernel/zion-driver.mod := printf '%s\n'   zion-enclave-driver.o zion-enclave-page.o zion-enclave-ioctl.o zion-enclave-memory.o zion-enclave-sbi.o | awk '!x[$$0]++ { print("/work/zion-env/zion-enclave/driver/kernel/"$$0) }' > /work/zion-env/zion-enclave/driver/kernel/zion-driver.mod

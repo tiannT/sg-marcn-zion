@@ -1,0 +1,1 @@
+savedcmd_/work/zion-env/zion-enclave/driver/kernel/zion-driver.o := riscv64-unknown-linux-gnu-ld -melf64lriscv -z noexecstack --no-warn-rwx-segments   -r -o /work/zion-env/zion-enclave/driver/kernel/zion-driver.o @/work/zion-env/zion-enclave/driver/kernel/zion-driver.mod 

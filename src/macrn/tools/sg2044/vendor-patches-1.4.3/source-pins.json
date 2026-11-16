@@ -1,0 +1,30 @@
+{
+  "release": "1.4.3_2026-01-30",
+  "wrapper": {
+    "repo": "sophgo/sophgo-edk2",
+    "commit": "d7ff67c22a2bd21c488dece30926754f39386775"
+  },
+  "modules": {
+    "edk2": "c4556927089d3c9164b1fcc28ca96edc93209677",
+    "edk2-platforms": "ae4bbbe79bc719fe441a0d94a407f52b42ed89e9",
+    "edk2-non-osi": "3f57e2cfa143168421e8ed0ad58da6322f0db6fa"
+  },
+  "board_profile": "SD3-10",
+  "declared_board_name": "SG2044_EVB",
+  "target_board_name": "SG2044_EVB",
+  "live_firmware_source_match": "not yet established",
+  "reservation": {
+    "base": "0x90000000",
+    "size": "0x01020000"
+  },
+  "published_ram_upper_address_changed": false,
+  "bootloader_reference": {
+    "repo": "sophgo/bootloader-riscv",
+    "commit": "b6e20f0c0111ed52e0c90f6e8d87f895569f1594",
+    "override_patch": "0003-bootloader-macrn-override.patch",
+    "apply_check": true,
+    "bash_syntax_check": true
+  },
+  "original_opensbi_reference": "15c8ab7701d19059e5cd2d39f58160cf6688e26e",
+  "zsbl_release_reference": "8769ba57ba44c2234038a328a4d5008a9b851c16"
+}

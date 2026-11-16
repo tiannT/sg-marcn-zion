@@ -1,0 +1,112 @@
+diff --git a/Platform/Sophgo/SG2044Pkg/SD3-10/SD3-10.dsc b/Platform/Sophgo/SG2044Pkg/SD3-10/SD3-10.dsc
+index cc626a0..330615c 100644
+--- a/Platform/Sophgo/SG2044Pkg/SD3-10/SD3-10.dsc
++++ b/Platform/Sophgo/SG2044Pkg/SD3-10/SD3-10.dsc
+@@ -633,6 +633,9 @@
+ 
+ # memory
+   gSophgoSG2044PlatformPkgTokenSpaceGuid.PcdMemoryBaseAddress|0x80000000
++  # m-ACRN private memory and the exported FDT; retain this in the EFI map.
++  gSophgoTokenSpaceGuid.PcdMacrnReservedBase|0x90000000
++  gSophgoTokenSpaceGuid.PcdMacrnReservedSize|0x01020000
+   # 128G
+   gSophgoSG2044PlatformPkgTokenSpaceGuid.PcdMemorySize|0x2000000000
+ 
+diff --git a/Silicon/Sophgo/Modules/MemoryInitPei/MemoryInitPei.c b/Silicon/Sophgo/Modules/MemoryInitPei/MemoryInitPei.c
+index 562b498..75f5aca 100644
+--- a/Silicon/Sophgo/Modules/MemoryInitPei/MemoryInitPei.c
++++ b/Silicon/Sophgo/Modules/MemoryInitPei/MemoryInitPei.c
+@@ -19,6 +19,7 @@
+ //
+ // The Library classes this module consumes
+ //
++#include <Library/BaseLib.h>
+ #include <Library/DebugLib.h>
+ #include <Library/HobLib.h>
+ #include <Library/IoLib.h>
+@@ -255,6 +256,8 @@ InitializeRamRegions (
+   UINT64                MemBaseAddress;
+   UINT64                MemSizeEfuse;
+   UINT64                ReservedMemSize;
++  UINT64                MacrnBase;
++  UINT64                MacrnSize;
+ 
+   Status = GetMemSizeFromEfusePei (&MemSizeEfuse);
+   if (EFI_ERROR (Status)) {
+@@ -287,7 +290,27 @@ InitializeRamRegions (
+   ShowMemValue("MemSizeTotal    ", MemSizeEfuse);
+   ShowMemValue("MemSizeReserved ", ReservedMemSize);
+ 
+-  AddMemoryRangeHob (MemBaseAddress, MemSize);
++  // Preserve this release's published upper address. Its existing call
++  // passes MemSize as a limit, rather than as a byte count.
++  MacrnBase = FixedPcdGet64 (PcdMacrnReservedBase);
++  MacrnSize = FixedPcdGet64 (PcdMacrnReservedSize);
++  if (MacrnSize == 0) {
++    AddMemoryRangeHob (MemBaseAddress, MemSize);
++    return;
++  }
++  if ((MacrnBase < MemBaseAddress) || (MacrnBase > MemSize) ||
++      (MacrnSize > MemSize - MacrnBase)) {
++    DEBUG ((DEBUG_ERROR, "Invalid m-ACRN reservation\n"));
++    ASSERT (FALSE);
++    CpuDeadLoop ();
++  }
++  if (MacrnBase > MemBaseAddress) {
++    AddMemoryRangeHob (MemBaseAddress, MacrnBase);
++  }
++  AddReservedMemoryBaseSizeHob (MacrnBase, MacrnSize);
++  if (MacrnBase + MacrnSize < MemSize) {
++    AddMemoryRangeHob (MacrnBase + MacrnSize, MemSize);
++  }
+ }
+ 
+ 
+@@ -394,4 +417,4 @@ PeiMemoryInitialization (
+   }
+ 
+   return EFI_SUCCESS;
+-}
+\ No newline at end of file
++}
+diff --git a/Silicon/Sophgo/Modules/MemoryInitPei/MemoryInitPei.inf b/Silicon/Sophgo/Modules/MemoryInitPei/MemoryInitPei.inf
+index 1a4d98a..2d91ca7 100644
+--- a/Silicon/Sophgo/Modules/MemoryInitPei/MemoryInitPei.inf
++++ b/Silicon/Sophgo/Modules/MemoryInitPei/MemoryInitPei.inf
+@@ -40,6 +40,7 @@
+   gEfiSophgoGlobalVariableGuid
+ 
+ [LibraryClasses]
++  BaseLib
+   DebugLib
+   HobLib
+   IoLib
+@@ -66,6 +67,8 @@
+   gSophgoSG2044PlatformPkgTokenSpaceGuid.PcdEfuseCellWidth
+ 
+   gSophgoTokenSpaceGuid.PcdEfiMemoryBottom
++  gSophgoTokenSpaceGuid.PcdMacrnReservedBase
++  gSophgoTokenSpaceGuid.PcdMacrnReservedSize
+   gSophgoSG2044PlatformPkgTokenSpaceGuid.PcdMemoryBaseAddress
+ 
+ 
+@@ -75,4 +78,4 @@
+ 
+ 
+ [Depex]
+-  gEfiPeiReadOnlyVariable2PpiGuid
+\ No newline at end of file
++  gEfiPeiReadOnlyVariable2PpiGuid
+diff --git a/Silicon/Sophgo/Sophgo.dec b/Silicon/Sophgo/Sophgo.dec
+index b890371..330d992 100644
+--- a/Silicon/Sophgo/Sophgo.dec
++++ b/Silicon/Sophgo/Sophgo.dec
+@@ -76,6 +76,8 @@
+   gSophgoTokenSpaceGuid.PcdTopBaseAddress|0x0|UINT64|0x00001021
+   gSophgoTokenSpaceGuid.PcdPeiPermanentMemBase|0x0|UINT64|0x00001022
+   gSophgoTokenSpaceGuid.PcdPeiPermanentMemSize|0x0|UINT64|0x00001023
++  gSophgoTokenSpaceGuid.PcdMacrnReservedBase|0x0|UINT64|0x00001025
++  gSophgoTokenSpaceGuid.PcdMacrnReservedSize|0x0|UINT64|0x00001026
+ 
+ [PcdsDynamic]
+   gSophgoTokenSpaceGuid.PcdFlashVariableOffset|0x0|UINT64|0x00001003

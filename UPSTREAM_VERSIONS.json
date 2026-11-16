@@ -1,0 +1,55 @@
+{
+  "macrn": {
+    "destination": "src/macrn",
+    "upstream_repository": "https://github.com/intel/acrn-riscv",
+    "upstream_commit": "dbc1501ef48623e68ce415305c84aa994de9b0b4",
+    "adaptation": "SG2044 no-H port, PMP isolation, shared I/O, Guest lifecycle and Zion-compatible CVM/Enclave services"
+  },
+  "asterinas": {
+    "destination": "src/asterinas",
+    "upstream_commit": "536593f341c581d430f6743cfd322c09e4e0be26",
+    "upstream_repository": "https://github.com/sdww0/asterinas.git",
+    "upstream_subdirectory": ".",
+    "adapted_paths": [
+      "kernel/comps/virtio/src/device/network/device.rs",
+      "kernel/comps/virtio/src/device/network/header.rs",
+      "osdk/src/base_crate/riscv64.ld.template",
+      "ostd/src/arch/riscv/boot/ap_boot.S",
+      "ostd/src/arch/riscv/boot/bsp_boot.S",
+      "ostd/src/arch/riscv/boot/mod.rs",
+      "ostd/src/arch/riscv/boot/smp.rs",
+      "ostd/src/mm/kspace/mod.rs",
+      "tools/tests/"
+    ]
+  },
+  "zion-enclave": {
+    "destination": "src/zion-enclave",
+    "upstream_commit": "76f2cd1e9119a7e139381c68019ba210fe5ee229",
+    "upstream_repository": "https://github.com/sdww0/zion-env.git",
+    "upstream_subdirectory": "zion-enclave"
+  },
+  "linux-cvm-kernel": {
+    "destination": "src/linux-cvm-kernel",
+    "type": "git-submodule",
+    "upstream_repository": "https://github.com/gregkh/linux.git",
+    "upstream_version": "6.12.35",
+    "upstream_tag": "v6.12.35",
+    "upstream_commit": "783cd2c3dca8b6c434e955b84c20c8940588dc68",
+    "local_source_modifications": false,
+    "configuration": "configs/linux-cvm.config"
+  },
+  "zion-cvm-security-model": {
+    "upstream_repository": "https://github.com/sdww0/zion",
+    "upstream_commit": "4d4054f21a6d818a11ce791ba2893384f55fe924",
+    "use": "CVM lifecycle, private context and shared-channel security semantics adapted in current m-ACRN",
+    "current_implementation": "src/macrn/hypervisor/arch/riscv/",
+    "original_H_KVM_tvm_backend_bundled": false,
+    "original_linux_forks": {
+      "repository": "https://github.com/sdww0/rockos-kernel",
+      "branches": [
+        "zion-host",
+        "zion-guest"
+      ]
+    }
+  }
+}

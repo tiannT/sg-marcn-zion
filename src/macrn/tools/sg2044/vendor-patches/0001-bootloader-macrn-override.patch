@@ -1,0 +1,19 @@
+--- a/scripts/envsetup.sh
++++ b/scripts/envsetup.sh
+@@ -464,6 +464,16 @@
+ 
+ function build_rv_sbi()
+ {
++	# Explicit opt-in: preserve the reviewed M-mode monitor instead of OpenSBI.
++	if [ -n "${MACRN_FW_DYNAMIC:-}" ]; then
++		if [ ! -s "$MACRN_FW_DYNAMIC" ] || [ "$(stat -c%s "$MACRN_FW_DYNAMIC")" -gt 2097152 ]; then
++			echo 'Invalid MACRN_FW_DYNAMIC: expected a nonempty raw image no larger than 2 MiB' >&2
++			return 1
++		fi
++		mkdir -p "$RV_FIRMWARE_INSTALL_DIR"
++		cp -v "$MACRN_FW_DYNAMIC" "$RV_FIRMWARE_INSTALL_DIR/fw_dynamic.bin" || return 1
++		return 0
++	fi
+ 	if [ ! -d $RV_SBI_SRC_DIR ]; then
+ 		echo 'No opensbi source code, using pre-built binaries'
+ 		mkdir -p $RV_FIRMWARE_INSTALL_DIR

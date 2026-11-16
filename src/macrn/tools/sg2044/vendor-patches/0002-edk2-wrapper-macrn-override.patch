@@ -1,0 +1,19 @@
+--- a/tools/envsetup.sh
++++ b/tools/envsetup.sh
+@@ -93,7 +93,15 @@
+ 	fi
+ 
+ 	cp -v $RV_FIRMWARE/zsbl.bin $RV_FIRMWARE_INSTALL_DIR
+-	cp -v $RV_FIRMWARE/fw_dynamic.bin $RV_FIRMWARE_INSTALL_DIR
++	if [ -n "${MACRN_FW_DYNAMIC:-}" ]; then
++		if [ ! -s "$MACRN_FW_DYNAMIC" ] || [ "$(stat -c%s "$MACRN_FW_DYNAMIC")" -gt 2097152 ]; then
++			echo 'Invalid MACRN_FW_DYNAMIC: expected a nonempty raw image no larger than 2 MiB' >&2
++			return 1
++		fi
++		cp -v "$MACRN_FW_DYNAMIC" "$RV_FIRMWARE_INSTALL_DIR/fw_dynamic.bin" || return 1
++	else
++		cp -v $RV_FIRMWARE/fw_dynamic.bin $RV_FIRMWARE_INSTALL_DIR
++	fi
+ 	cp -v $RV_FIRMWARE/sg2044-*.dtbo $RV_FIRMWARE_INSTALL_DIR
+ 
+ 	build_pack
