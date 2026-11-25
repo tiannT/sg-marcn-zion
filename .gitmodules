@@ -1,4 +1,5 @@
 [submodule "linux-cvm-kernel"]
-	path = src/linux-cvm-kernel
-	url = https://github.com/gregkh/linux.git
-	shallow = true
+    path = source/linux-cvm-kernel
+    url = https://github.com/sdww0/rockos-kernel.git
+    branch = zion-guest
+    shallow = true

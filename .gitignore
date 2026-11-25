@@ -1,24 +1,13 @@
-# Generated local output; source trees are kept under src/.
-/build/
-/dist/
 /inputs/
 /local/
+/logs/
+/state/
 **/__pycache__/
-**/.pytest_cache/
-/src/asterinas/**/target/
-/src/asterinas/target/
 *.pyc
-*.pyo
 *.o
 *.ko
-*.rmeta
-*.rlib
 *.log
-*.tmp
-*~
-# Credentials must be generated and stored outside the source snapshot.
-id_rsa
-id_ed25519
-*_host_*_key
-guest_test_ed25519
-.env
+*.img
+*.fd
+*.bin
+guest_kernel_image

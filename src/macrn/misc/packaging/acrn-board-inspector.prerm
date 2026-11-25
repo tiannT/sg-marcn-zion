@@ -1,5 +1,0 @@
-# Remove the folder of the /bin/ directory
-rm -rf /bin/pcieparser
-rm -rf /bin/memmapparser
-rm -rf /bin/legacy
-rm -rf /bin/extractors

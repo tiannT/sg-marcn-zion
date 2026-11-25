@@ -1,0 +1,11 @@
+{
+  "kernel_release": "6.6.88+",
+  "kernel_filename": "guest_kernel_image",
+  "kernel_bytes": 28683264,
+  "kernel_sha256": "92aad425c161139362a64913b254f9d06610b5d3f37b1f4b9a9f74cd19ce90c2",
+  "source_repository": "https://github.com/sdww0/rockos-kernel.git",
+  "source_branch": "zion-guest",
+  "source_commit": "ba3a4296ab14d57143c8398cfe493696b61207c5",
+  "runtime_policy": "Reuse the existing Tianquan kernel and matching Guest userland/modules from the R3 delivery; no kernel rebuild",
+  "reference_image_source_commit_independently_proven": false
+}

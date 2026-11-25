@@ -1,2 +1,0 @@
-# manpages are missing in upstream
-acrn-devicemodel: binary-without-manpage usr/bin/acrn-dm

@@ -1,2 +1,0 @@
-# manpages are missing in upstream
-python3-acrn-board-inspector: no-manual-page usr/bin/acrn-board-inspector

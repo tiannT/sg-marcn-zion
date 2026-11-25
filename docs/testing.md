@@ -1,6 +1,6 @@
 # r3测试说明
 
-所有测试在SG2044的管理Linux本机及其Guest执行。先完成[安装](getting-started.md)。以下是输入和预期判据，不是某台机器已通过的成绩。
+所有测试在SG2044的管理Linux本机及其Guest执行。先完成[R3部署](deployment.md)。以下是输入和预期判据，不是某台机器已通过的成绩。
 
 | 旧脚本编号 | 当前非H编号 | 项目 |
 |---|---|---|
@@ -15,7 +15,7 @@
 | 0009 | 0017 | Linux网络与块读取 |
 | 0010 | 0018 | CVM与独立Enclave |
 
-`runtime/run-case.sh`每次执行一个旧编号并保存完整stdout、stderr和退出码JSON；数据库脚本位于`runtime/guest/`。从部署暂存目录调用时保留runtime目录结构。以下手动方法使用默认入口，自定义安装时对应替换路径。
+`run-case.sh`每次执行一个旧编号并保存完整stdout、stderr和退出码JSON；数据库脚本位于`guest/`。从本仓库根目录调用。以下手动方法使用默认入口，自定义安装时对应替换路径。执行数据库脚本前，在Host设置ZION_SOURCE为本仓库的绝对路径。
 
 ## Host准备
 
@@ -57,17 +57,17 @@ ssh -p 10022 root@127.0.0.1
 在已启动Asterinas的Host中，将实际脚本通过SSH stdin传给Guest：
 
 ```bash
-ssh -p 10022 root@127.0.0.1 'sh -s' < "$ZION_STAGE/runtime/guest/test-redis.sh"
+ssh -p 10022 root@127.0.0.1 'sh -s' < "$ZION_SOURCE/guest/test-redis.sh"
 ```
 
-脚本源码为`runtime/guest/test-redis.sh`；也可由Host通过SSH stdin执行该文件。要求Redis 7.0.15、PING输出PONG，负载参数为`-n 100000 -c 20 -r 10000 -d 256 -t set,get -q`，SET和GET均输出吞吐和延迟汇总。脚本单独校验benchmark退出码，正常关闭测试实例；保留`redis-benchmark.log`和服务日志。
+脚本源码为`guest/test-redis.sh`；也可由Host通过SSH stdin执行该文件。要求Redis 7.0.15、PING输出PONG，负载参数为`-n 100000 -c 20 -r 10000 -d 256 -t set,get -q`，SET和GET均输出吞吐和延迟汇总。脚本单独校验benchmark退出码，正常关闭测试实例；保留`redis-benchmark.log`和服务日志。
 
 ## 0014：MySQL
 
 在Host执行下列命令，将实际脚本传给Asterinas Guest：
 
 ```bash
-ssh -p 10022 root@127.0.0.1 'sh -s' < "$ZION_STAGE/runtime/guest/test-mysql.sh"
+ssh -p 10022 root@127.0.0.1 'sh -s' < "$ZION_SOURCE/guest/test-mysql.sh"
 ```
 
 它按`/etc/zion-mysql.cnf`初始化隔离测试目录、等待服务就绪、建立本机测试账号并执行官方mysqlslap。版本应为8.0.46，缓冲池33554432字节、native AIO=0；负载为mixed、并发2、轮数2、查询200，正常输出平均/最小/最大耗时、2客户端、平均每客户端100查询。脚本校验独立负载退出码，保存mysql-benchmark.log并清理测试服务。

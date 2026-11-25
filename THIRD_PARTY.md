@@ -1,15 +1,7 @@
-# 组件来源与许可证
+# 组件来源
 
-本源码目录由多个组件组成，各文件沿用原有许可证与版权声明。本清单不将不同许可证合并为一种许可证。
+监控器和控制工具源文件来自R3交付包所记录的m-ACRN基础源码及已应用的四份适配补丁，保留原文件版权/SPDX和[source/macrn/LICENSE](source/macrn/LICENSE)。Host驱动源文件直接取自同一R3交付包。
 
-| 组件 | 来源 | 许可证入口 |
-|---|---|---|
-| m-ACRN 及 SG2044/方案 B 适配 | 上游 `intel/acrn-riscv` 基础上的当前融合工作树 | `src/macrn/LICENSE` 及文件 SPDX 声明 |
-| Asterinas | `sdww0/asterinas` 固定提交基础上的实际移植工作树 | `src/asterinas/LICENSE-MPL`、`COPYRIGHT` 及各子组件声明 |
-| Zion Enclave | `sdww0/zion-env` 中的 `zion-enclave/` 当前源码 | `src/zion-enclave/LICENSE` 及各子组件声明 |
-| Zion CVM 安全管理模型 | `sdww0/zion` 的 CVM、上下文及保护区管理设计，适配实现合入当前 m-ACRN | 当前适配源文件声明；上游来源记录于 `UPSTREAM_VERSIONS.json` |
-| Linux CVM | `gregkh/linux` 的 Linux 6.12.35 固定提交，以 Git 子模块引用 | 初始化后见 `src/linux-cvm-kernel/COPYING`、`LICENSES/` 及文件 SPDX 声明 |
+Linux CVM的源码引用为sdww0/rockos-kernel的zion-guest固定提交ba3a4296ab14d57143c8398cfe493696b61207c5，其基础版本为6.6.88。实际运行复用既有6.6.88+参考Image及匹配模块；两者的二进制来源标识见kernel-reference.json，不将源码引用声称为参考Image的逐字复现证明。
 
-具体上游提交、版本和本地修改范围见 `UPSTREAM_VERSIONS.json`。完整 Git 历史和旧版本快照未包含在本目录中。
-
-Linux 内核和 Asterinas 均为已有开源操作系统主体；本项目的新增和适配范围见 [代码来源说明](docs/code-origin.md)。
+Guest内的Asterinas、BusyBox、SQLite、Redis、MySQL和Zion Enclave程序继续使用R3交付的配套版本，各自保留其原有许可证与版权。未将旧仓库中的另一套Guest源码或内核版本作为R3运行输入。
