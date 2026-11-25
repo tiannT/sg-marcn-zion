@@ -25,6 +25,14 @@ static inline void spinlock_init(spinlock_t *lock)
 	(void)memset(lock, 0U, sizeof(spinlock_t));
 }
 
+/* Failure must not reserve a ticket: the remote owner may be stopped. */
+static inline bool spinlock_try_obtain(spinlock_t *lock)
+{
+	uint64_t ticket = __atomic_load_n(&lock->tail, __ATOMIC_ACQUIRE);
+	return __atomic_compare_exchange_n(&lock->head, &ticket, ticket + 1U,
+		false, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED);
+}
+
 static inline void spinlock_obtain(spinlock_t *lock)
 {
 	asm volatile ("   li t0, 0x1\n\t"

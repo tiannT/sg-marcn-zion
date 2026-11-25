@@ -1,8 +1,8 @@
 {
   "format": 2,
-  "description": "Project source, public deployment documentation and pinned Linux submodule reference",
-  "file_count": 4238,
-  "total_bytes": 54905162,
+  "description": "r3 project source, public build and deployment documentation, pinned optional Linux source reference",
+  "file_count": 4254,
+  "total_bytes": 54921906,
   "files": [
     {
       "path": ".gitignore",
@@ -16,8 +16,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 4150,
-      "sha256": "17bdd5c30a38c223257915d22a3d5b92a46ddcc28e05a08c20e711177098ee91"
+      "bytes": 2751,
+      "sha256": "98fe55cf3e537affb45e31769d3dafe16d82adf3014a9d1401c014189c88a58d"
     },
     {
       "path": "THIRD_PARTY.md",
@@ -26,8 +26,8 @@
     },
     {
       "path": "UPSTREAM_VERSIONS.json",
-      "bytes": 2145,
-      "sha256": "3225c64c1ccc414ef73908d8607add1505efdfffde8c4485e1506839d75ea0b8"
+      "bytes": 3397,
+      "sha256": "6802f9c5fac539d9c2487928fe85d37815ab9a6b29d406b695e6b78680d0e8e1"
     },
     {
       "path": "configs/deployment.env.example",
@@ -40,34 +40,44 @@
       "sha256": "4fe9c70f11b91244c9546c94979965043df72eec15ddac0a3e10dbc3a430f18b"
     },
     {
+      "path": "configs/zion-mysql.cnf",
+      "bytes": 395,
+      "sha256": "7c664f45680ca8f7f5bd92baa9b898f0c99df1274079b3aee102101267636140"
+    },
+    {
       "path": "docs/build.md",
-      "bytes": 8425,
-      "sha256": "16b42e5387f7d0c4138c0a82d1ddf29ddf4a266291562c1e3b31d33f1b4c003d"
+      "bytes": 9230,
+      "sha256": "145a141c5a358d032d3e4e1681329fe7e03b98111fea04b319c926454445cdbe"
     },
     {
       "path": "docs/code-origin.md",
-      "bytes": 3977,
-      "sha256": "851424327f8141ea6faad6cff9175da0816df9e7ce2c1afa3f36926eac6dd8a0"
+      "bytes": 4311,
+      "sha256": "a727e9f7cca46c17e8ba91efc5ffb55e0a06a90d66d81ec6a0ecda3b8f4038e5"
     },
     {
       "path": "docs/design.md",
-      "bytes": 20838,
-      "sha256": "66acfb090b8c0d852874167cec4218ae4cf1b71ef6caf75cc85a40e39187a1b0"
+      "bytes": 1460,
+      "sha256": "2f221669328dc0fd45020d6f786bdce33e8c486da7008c9e26e1b6626811d9f3"
     },
     {
       "path": "docs/getting-started.md",
-      "bytes": 10990,
-      "sha256": "5014186c8048c3ec5f0d5e20b958e6f9cc30fe3697d7aeac7a2a9aeed97d1936"
+      "bytes": 5613,
+      "sha256": "a6db26c9380db3bb4041f6a17a37949a8a7f24966853f404addb08f23ce42824"
     },
     {
       "path": "docs/guest-rootfs.md",
-      "bytes": 3468,
-      "sha256": "46f76107e1bb23b06eead4e0cdbbb7e379c163a64e908451a08ceac736cb67bb"
+      "bytes": 3045,
+      "sha256": "ffe364b78dd3bbaf9a53119a6c2259aeedfd94f138dee951750bd039e459cf6c"
+    },
+    {
+      "path": "docs/r3-source.md",
+      "bytes": 2932,
+      "sha256": "0d10e84008f82d2a4a67c912efffc192c6ab7758b25d45c2a5a200a8426c10c7"
     },
     {
       "path": "docs/testing.md",
-      "bytes": 17280,
-      "sha256": "677a9a32ff814e2225895bbe773b0dc7b35520cd8bde26885bbcd11e83cd3713"
+      "bytes": 6475,
+      "sha256": "fdcef8c6e4c38b9a096c41f480f740143d01f799e8a26024e7567e4c5024399f"
     },
     {
       "path": "recipes/tee-apps.nix",
@@ -76,8 +86,8 @@
     },
     {
       "path": "runtime/guest/asterinas-init.sh",
-      "bytes": 555,
-      "sha256": "d572f23e221cb3c1ebb8a1fc782a8420ad863e4bd5137ab091307b934844bedf"
+      "bytes": 313,
+      "sha256": "9f0378d3839c1cf41a0be8487171b02ed230b09bb2dda6a3ab822aa542895507"
     },
     {
       "path": "runtime/guest/asterinas-services.sh",
@@ -86,13 +96,53 @@
     },
     {
       "path": "runtime/guest/linux-init.sh",
-      "bytes": 983,
-      "sha256": "e20614216f5c65941730a862c24fa3bf9db4bae1f5eee3297ab7c066537da85a"
+      "bytes": 359,
+      "sha256": "ffe41056d1f51458e31956a344ba2e62efec7c1ba19e62cc89654524cee45be7"
+    },
+    {
+      "path": "runtime/guest/test-mysql.sh",
+      "bytes": 2322,
+      "sha256": "c6388864536c1f9f71f0d1bd7ddb0f6ab19bebafd3d15c387d25ca1006b8129c"
+    },
+    {
+      "path": "runtime/guest/test-redis.sh",
+      "bytes": 1334,
+      "sha256": "09dc3e257106224c9ca6d742190f86b884859c70c753b7fd2597fac283731017"
+    },
+    {
+      "path": "runtime/host-driver/Makefile",
+      "bytes": 28,
+      "sha256": "7230e88acf60497f8fc11c640b55ab443316d9621079de406a915a341c673af9"
+    },
+    {
+      "path": "runtime/host-driver/kvm.c",
+      "bytes": 1140,
+      "sha256": "055163b3a077b08e34127122842f1b59d40f9c1508a6e8cc2cad89f128c937f3"
+    },
+    {
+      "path": "runtime/host-driver/native_uapi.h",
+      "bytes": 639,
+      "sha256": "1241811af14c60f326423970c617780ba3a7ebdf25849fcd3d6746b394fcde65"
+    },
+    {
+      "path": "runtime/host-driver/tvm-control.c",
+      "bytes": 1765,
+      "sha256": "5e092ffc4b489f6b5b9b6196818d4137319052070ec924e1f44b0fa68726c399"
+    },
+    {
+      "path": "runtime/host-driver/tvm-driver.c",
+      "bytes": 5788,
+      "sha256": "e35d8e4aaccfc0d673c3bec93fdb0f8f4ef9a79f8c86c216a03917b4d50abb6c"
     },
     {
       "path": "runtime/planb-runtime.sh",
-      "bytes": 5217,
-      "sha256": "4c039bd3b8b76a20d0b59f5433161be2cb2c68f5028804f748e0ed11be8087c0"
+      "bytes": 6035,
+      "sha256": "0aee72af7b1b6f9a08af473d7b2e752535fbf2085e5f1ca4686ab90a67b75ee5"
+    },
+    {
+      "path": "runtime/run-case.sh",
+      "bytes": 3314,
+      "sha256": "0c0a802b5fb1e9c6bbdb14edbe82d45797a854024d87597c877ead28e5645145"
     },
     {
       "path": "runtime/zion-compat/common.py",
@@ -101,28 +151,28 @@
     },
     {
       "path": "runtime/zion-compat/install.py",
-      "bytes": 7441,
-      "sha256": "d26c99886f3745256d42f48a9e5a469ab213638f9a1a81e52239ee8e3a4ffaa9"
+      "bytes": 7731,
+      "sha256": "459b6bd094eb779866af64eac2e19a1e9b9c11522abcab97ad10bb2808881e0b"
     },
     {
       "path": "runtime/zion-compat/portproxy.py",
-      "bytes": 1574,
-      "sha256": "c339466c71f17bc573f9fcad68d29044f62cfe1a78047ba8bbe6f108e057ecf6"
+      "bytes": 1593,
+      "sha256": "11f823d54493360e32b1db6dc952e1dc91f3235c18be0a6f88d051a3d65fae8c"
     },
     {
       "path": "runtime/zion-compat/test_compat.py",
-      "bytes": 5019,
-      "sha256": "5b8b53f7b5aa1446567b7f21b5c094364e912e904f75b306c731f24ab63c6bb7"
+      "bytes": 4931,
+      "sha256": "9b88bd4b859e835e82698e273c77700d787d0182a309705fb25d4291dda0275e"
     },
     {
       "path": "runtime/zion-compat/test_install.py",
-      "bytes": 6212,
-      "sha256": "a1c45e828c79c20b5225b2662549e0f79f1bbedd9e34695f63589e7546699357"
+      "bytes": 6393,
+      "sha256": "e31f7779a491de7438131db66f7b05da1619f66d1f72ed767b4f4ff5b7ff830e"
     },
     {
       "path": "runtime/zion-compat/verify-compat.sh",
-      "bytes": 5924,
-      "sha256": "0c24569feaf7d6f543617a56cd688c77d5cb750978bb03417bc056f821826019"
+      "bytes": 460,
+      "sha256": "4300ceb1770ce343b1436e4245ccd8ce733c1f27f72cd406f74c794b66df347f"
     },
     {
       "path": "runtime/zion-compat/zion-runtime.sh",
@@ -131,8 +181,13 @@
     },
     {
       "path": "runtime/zion-compat/zion_runtime.py",
-      "bytes": 14745,
-      "sha256": "f0060ea913526a95395348224a01b31285fbfbf76d6afbfd70436578adcea0fa"
+      "bytes": 15192,
+      "sha256": "c8a49ec2be9bbdf0bb2a5ce1a7c496ef6d78b10b76fcd8f059cc499d8a2a5b3b"
+    },
+    {
+      "path": "scripts/build-host-driver.sh",
+      "bytes": 1115,
+      "sha256": "1bab5021d6f1f2843024a0e876064dbbffb4eb1950c66f5bc1c33e2a820137a4"
     },
     {
       "path": "scripts/build-linux-cvm.sh",
@@ -146,8 +201,8 @@
     },
     {
       "path": "scripts/build-tools.sh",
-      "bytes": 923,
-      "sha256": "f03c2eb3501a275f2758a3950298dd3a841383d54ce270c6d611bd145ec058e3"
+      "bytes": 1371,
+      "sha256": "6b0415adc41e1820c1704ca04644382d293776a80f19255c441d88991df5db9a"
     },
     {
       "path": "scripts/check-source.py",
@@ -160,9 +215,29 @@
       "sha256": "20cb242f4d0e804a9dcba5a7eaae09b8e76ef1f5af168bb583a572e9e3a02d04"
     },
     {
+      "path": "scripts/native_fdt.py",
+      "bytes": 2001,
+      "sha256": "62e2e6b2aed5e44c37a84bafc85ba236003456bc5ee53dba6387687996f92a8e"
+    },
+    {
       "path": "scripts/package-firmware.py",
-      "bytes": 2571,
-      "sha256": "5cb9cd1dd81ae4df6043f0adceee73961b41392375ca1a5bfba6656cdb661959"
+      "bytes": 2662,
+      "sha256": "99d5aac77cb4cf516beac2802ba7478ec1db96b5b3d6b36d9815e31ab630d871"
+    },
+    {
+      "path": "scripts/prepare-asterinas-initramfs.py",
+      "bytes": 5893,
+      "sha256": "0b50419af52ffffde3bfbebad78feb6243358d160cf23a4a4833f50c4956c71b"
+    },
+    {
+      "path": "scripts/prepare-reference-asterinas.py",
+      "bytes": 4131,
+      "sha256": "5a58b2d8a590c78e21d0eefa41f86f87e729032a8b69d7a864d3118ff2fdb786"
+    },
+    {
+      "path": "scripts/prepare-reference-linux.py",
+      "bytes": 3980,
+      "sha256": "c1290d12dcbacfe1fc2912c16bdef62716b4468fb6748f222cd0fcabe60a01f9"
     },
     {
       "path": "scripts/provision_test_entropy.py",
@@ -12001,9 +12076,7 @@
     },
     {
       "path": "src/linux-cvm-kernel",
-      "gitlink": "783cd2c3dca8b6c434e955b84c20c8940588dc68",
-      "url": "https://github.com/gregkh/linux.git",
-      "tag": "v6.12.35"
+      "gitlink": "783cd2c3dca8b6c434e955b84c20c8940588dc68"
     },
     {
       "path": "src/macrn/.checkpatch.conf",
@@ -16277,8 +16350,8 @@
     },
     {
       "path": "src/macrn/hypervisor/arch/riscv/guest/sbi.c",
-      "bytes": 14418,
-      "sha256": "c3a3bc9a427b692996e70a679020b40d16b9cbb4c9d413b195786c0085c7096c"
+      "bytes": 16193,
+      "sha256": "f591b1e5022dd1fe599a051699891169ebfb9c079a58649e876bf83abce47858"
     },
     {
       "path": "src/macrn/hypervisor/arch/riscv/guest/sbi.h",
@@ -16317,8 +16390,8 @@
     },
     {
       "path": "src/macrn/hypervisor/arch/riscv/guest/vio.c",
-      "bytes": 10712,
-      "sha256": "7192701f119f90f4a07130c252e683d392fea175575144337dc72582a14a3f94"
+      "bytes": 11516,
+      "sha256": "9771e0e93aa61f4dbee0d8dcd58e65e6eb9aeaaaea839221f9005f4a83f198c3"
     },
     {
       "path": "src/macrn/hypervisor/arch/riscv/guest/virq.c",
@@ -16342,8 +16415,8 @@
     },
     {
       "path": "src/macrn/hypervisor/arch/riscv/guest/vmcs.c",
-      "bytes": 11811,
-      "sha256": "532b4eebcc5ce6ad1395c75d9aa5af9dde81dbd6477c51dc286706d8ebc0b349"
+      "bytes": 11879,
+      "sha256": "5a9f0609af972c2a7220d768730658e64c3fcc150fb403bdfd68fea774c2b54f"
     },
     {
       "path": "src/macrn/hypervisor/arch/riscv/guest/vmexit.c",
@@ -16387,8 +16460,8 @@
     },
     {
       "path": "src/macrn/hypervisor/arch/riscv/guest/vplic.c",
-      "bytes": 12084,
-      "sha256": "8f634d7dcc03a61f58f7570790f85101ad8b734729eb1f80e7c0c73027057765"
+      "bytes": 14030,
+      "sha256": "49f4de3c241b1eac0c9ee57c38e4607ff4a13995f12812bcdbfc318d7513ea77"
     },
     {
       "path": "src/macrn/hypervisor/arch/riscv/guest/vplic_priv.h",
@@ -16397,8 +16470,8 @@
     },
     {
       "path": "src/macrn/hypervisor/arch/riscv/guest/vuart.c",
-      "bytes": 14185,
-      "sha256": "7da09d76992d830e5304cde6b9c1ff20957a8b08bcf5932064c63a8e987c9c4a"
+      "bytes": 14591,
+      "sha256": "a8454f69e64647783cc335fbddf79a042470f7fa9d4d10d24290516352b25f54"
     },
     {
       "path": "src/macrn/hypervisor/arch/riscv/intr.s",
@@ -16467,8 +16540,8 @@
     },
     {
       "path": "src/macrn/hypervisor/arch/riscv/mtrap.c",
-      "bytes": 2155,
-      "sha256": "6f2d43752ce370404ea2f004cd4d65ec1796209da134cfb11a8af723433cf7e1"
+      "bytes": 2413,
+      "sha256": "96a55c4948751627268e5eb5a3db9042e626992e1bfd89591d5b3c46a567fb4e"
     },
     {
       "path": "src/macrn/hypervisor/arch/riscv/notify.c",
@@ -16497,18 +16570,18 @@
     },
     {
       "path": "src/macrn/hypervisor/arch/riscv/planb_enclave.c",
-      "bytes": 18649,
-      "sha256": "07568256e965e0e177ab914fcff97abab9374b22cb7aa8b11ef16446dcf26434"
+      "bytes": 20488,
+      "sha256": "6cc688d00b65791c97d5d65d74460bc2416c338a7b2814b10715cbfa0ab97d17"
     },
     {
       "path": "src/macrn/hypervisor/arch/riscv/planb_io.c",
-      "bytes": 22948,
-      "sha256": "c59f52a00c77be978bff1b7a0cde291390f825cfedf8122bfa5254622c606ec3"
+      "bytes": 25301,
+      "sha256": "2126daa394114989f97be09599470959de5229e13442dbd2fb4a55e52b925325"
     },
     {
       "path": "src/macrn/hypervisor/arch/riscv/planb_runtime.c",
-      "bytes": 7617,
-      "sha256": "8fec31a880cdda9c788cc7ec29a17860943654ac1c0aeae46601c5535e09988a"
+      "bytes": 8713,
+      "sha256": "dabc001c04449d88349f79373511752e81dd8266a3fe38c2144cc519270ab6d2"
     },
     {
       "path": "src/macrn/hypervisor/arch/riscv/planb_sha3/COPYING.BSD",
@@ -16567,8 +16640,8 @@
     },
     {
       "path": "src/macrn/hypervisor/arch/riscv/sg2044_static.c",
-      "bytes": 13696,
-      "sha256": "37e3b0b439724765f1d802f4a084907bdae016a6aed6866bae6f8d88768303f7"
+      "bytes": 13704,
+      "sha256": "2f69ed3abe4e94b460c16ae8c4c7ab2300011d5770813f14f8add7fbc8e6b119"
     },
     {
       "path": "src/macrn/hypervisor/arch/riscv/sifive_uart.c",
@@ -16582,8 +16655,8 @@
     },
     {
       "path": "src/macrn/hypervisor/arch/riscv/smpboot.c",
-      "bytes": 3245,
-      "sha256": "f84302451f15742f4348aba9c7cb68a3dc7a5bf9008cd5f163f4f8e60ccaf450"
+      "bytes": 3314,
+      "sha256": "51d757fde5e7c904ed107ff8d951da01f24843171e2856378b6483f9adb460a6"
     },
     {
       "path": "src/macrn/hypervisor/arch/riscv/start.s",
@@ -16597,8 +16670,8 @@
     },
     {
       "path": "src/macrn/hypervisor/arch/riscv/static_vm.c",
-      "bytes": 21896,
-      "sha256": "195407bf23a8ea6b7d3063c6fd02e3a8de8942f7f890c0a4847f3d6f542ad7c2"
+      "bytes": 22424,
+      "sha256": "dc3cb7825da9249e3e4331df30c3c611a978e4ebe652d374533470a53f3fa247"
     },
     {
       "path": "src/macrn/hypervisor/arch/riscv/timer.c",
@@ -17162,8 +17235,8 @@
     },
     {
       "path": "src/macrn/hypervisor/debug/console.c",
-      "bytes": 5833,
-      "sha256": "fff3989b4f314db37086e681cd4297a242ffb259dadf055c7977767c053250ba"
+      "bytes": 6554,
+      "sha256": "0811b4b8528db8642c95e6361fd15d5a60dd8c304ac911e341ed7c6843f7b004"
     },
     {
       "path": "src/macrn/hypervisor/debug/dbg_cmd.c",
@@ -17497,13 +17570,13 @@
     },
     {
       "path": "src/macrn/hypervisor/include/arch/riscv/asm/guest/vplic.h",
-      "bytes": 1216,
-      "sha256": "f95d40ca2c3ba1e247e5cbe0bf9d0ba39c76d6dd9d16628624049c6eef04f266"
+      "bytes": 1502,
+      "sha256": "f68a6e12d6ff41911f850f1d7a890105dcff44a7ca9393da4124e41afcb51ce0"
     },
     {
       "path": "src/macrn/hypervisor/include/arch/riscv/asm/guest/vuart.h",
-      "bytes": 2053,
-      "sha256": "0c017c58b71a585c8ced8bd2540a3c48f1515b42d44f96e50b9d66f5e5dae578"
+      "bytes": 2110,
+      "sha256": "db0e12fc436f831ea663652cd34b4b4882373c22ce532e7d9dbd2073b42b225d"
     },
     {
       "path": "src/macrn/hypervisor/include/arch/riscv/asm/image.h",
@@ -17542,8 +17615,8 @@
     },
     {
       "path": "src/macrn/hypervisor/include/arch/riscv/asm/lib/spinlock.h",
-      "bytes": 2152,
-      "sha256": "0a8d7a44a661a86d20b7e6d02be20bf0f442fdeedf611b704f31ce58581aa27f"
+      "bytes": 2472,
+      "sha256": "7bc69212d90975f99b051fd2fd1e0de8f7d4792b64f98d2850ec7fc31542b54c"
     },
     {
       "path": "src/macrn/hypervisor/include/arch/riscv/asm/lib/string.h",
@@ -17582,8 +17655,13 @@
     },
     {
       "path": "src/macrn/hypervisor/include/arch/riscv/asm/planb_abi.h",
-      "bytes": 1513,
-      "sha256": "251f92180d8d0a3e261d40b0f84af4b2201582c6dcee3df5b65b1ab722c8deb1"
+      "bytes": 1707,
+      "sha256": "25f2a11073c14a2b63cfa7c06adb3194da94c4d4fa8916b5bd1f273e9bf51029"
+    },
+    {
+      "path": "src/macrn/hypervisor/include/arch/riscv/asm/planb_console.h",
+      "bytes": 396,
+      "sha256": "716987c12d34ae4abf0705b9dd6ea2cb8f4b589105bff4662593bd7076e67619"
     },
     {
       "path": "src/macrn/hypervisor/include/arch/riscv/asm/planb_enclave.h",
@@ -17597,8 +17675,8 @@
     },
     {
       "path": "src/macrn/hypervisor/include/arch/riscv/asm/planb_runtime.h",
-      "bytes": 1104,
-      "sha256": "00d62070cd80de21d98379152153a62c5ca53ec960869bd762d52dff533f4a54"
+      "bytes": 1426,
+      "sha256": "07bd6fd2eff32e7e30ab64733344317eb4c96ff79be11f5fc1e4701325e6cf60"
     },
     {
       "path": "src/macrn/hypervisor/include/arch/riscv/asm/platform_boot.h",
@@ -17657,8 +17735,8 @@
     },
     {
       "path": "src/macrn/hypervisor/include/arch/riscv/asm/static_vm.h",
-      "bytes": 1525,
-      "sha256": "e4c68585f5666d795c3628f296ccb67c0e786e6d55a5cc6022845b67c587853b"
+      "bytes": 1602,
+      "sha256": "9523903d9104ea7e9e1ee210157b1a6396bbd00fde438e3a7140dabfc9979466"
     },
     {
       "path": "src/macrn/hypervisor/include/arch/riscv/asm/system.h",
@@ -19487,8 +19565,8 @@
     },
     {
       "path": "src/macrn/tools/sg2044/build_runtime_bundle.py",
-      "bytes": 4279,
-      "sha256": "cd539c01f2a59f46220e7899450458dc9c61c6f6b01bce66747ba3233c2ce135"
+      "bytes": 5685,
+      "sha256": "5b1e24e3e972f4f1c2fa2e7c76d1256c773bd658490631c3b89e3fb3dcd4e63c"
     },
     {
       "path": "src/macrn/tools/sg2044/build_sd_image.py",
@@ -19507,8 +19585,8 @@
     },
     {
       "path": "src/macrn/tools/sg2044/planb_backend.c",
-      "bytes": 15747,
-      "sha256": "14a8118ad809da287a85a15566394c1e015301b5b9b328229fd50b6544deef09"
+      "bytes": 19726,
+      "sha256": "f6606b15de8aa71f57d74df1579a87a5e59d3e97c96ad1067a24519840abeda0"
     },
     {
       "path": "src/macrn/tools/sg2044/planb_enclave_guard.c",
@@ -19517,8 +19595,8 @@
     },
     {
       "path": "src/macrn/tools/sg2044/planb_guestctl.c",
-      "bytes": 2987,
-      "sha256": "5c3d18fc0f2c54048516d242ab61e8e3cd0f9adab7c3e78b22c12b19133eecae"
+      "bytes": 3161,
+      "sha256": "ef1d85899004e7d8bb81aa859b72805449993c670d75d107e2bfc07f117a287d"
     },
     {
       "path": "src/macrn/tools/sg2044/run-pmp-live.sh",

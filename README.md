@@ -1,81 +1,40 @@
-# SG2044 方案 B：m-ACRN、Rust OS 与 Zion 融合源码
+# SG2044：m-ACRN、Asterinas 与 Zion 集成源码
 
-本项目组合 m-ACRN、Asterinas 和 Zion 相关组件，在无 H 扩展的 SG2044 上提供受保护 Guest、受控 I/O 和 Linux CVM 内嵌 Enclave 的运行环境。
+当前代码对应 **r3 原命令三项补齐版本**。SG2044 无 RISC-V H 扩展，使用 M-mode 监控器、物理 Hart 分域和 PMP：VM0 管理 Linux 常驻，VM1 可受控切换 Asterinas、Linux CVM 和独立 Enclave 模式。
 
-SG2044 不具备 RISC-V H 扩展。本方案以统一 M-mode 监控器、物理 Hart 分域和真实 PMP 为基础：VM0 管理 Linux 持续运行，VM1 在 Asterinas 与 Linux CVM 之间受控切换。Zion 安全语义适配和 Linux CVM 内的驱动、SDK、runtime 提供共享通道检查及内嵌 Enclave 功能；VM0 命令兼容层保留原 Zion 操作入口。
+r3 提供真实 `/dev/tvm` 受保护内存访问接口、`/sys/module/kvm/parameters/zion_vcpu_tamper` 一次性 S3 注入接口，以及无 virtio-blk 的独立 image3。`kvm.ko` 提供历史参数兼容，不实现 H 扩展或 `/dev/kvm`。Guest 软件在构建时直接内置 initramfs，启动过程无需解开应用压缩层。
 
-## 目录
+首次使用请从[安装与部署](docs/getting-started.md)开始，再按[测试说明](docs/testing.md)执行。源码来源及公开构建入口的参数化改动见[r3版本说明](docs/r3-source.md)。
 
 | 路径 | 内容 |
 |---|---|
-| `src/macrn/` | 当前融合版监控器、SG2044 支持、PMP、I/O、生命周期、Enclave 和工具源码 |
-| `src/asterinas/` | 实际移植后的 Asterinas、OSTD、OSDK 和源码统计脚本 |
-| `src/zion-enclave/` | 当前复用的 Zion Linux 驱动、SDK、runtime、loader 和应用源码 |
-| `src/linux-cvm-kernel/` | Linux 6.12.35 Git 子模块，固定上游提交，主仓库不附带整套内核源码 |
-| `runtime/zion-compat/` | Zion 原命令兼容层、安装程序和当前测试脚本 |
-| `runtime/guest/` | Asterinas、Linux Guest 初始化与服务脚本 |
-| `configs/` | Linux CVM 构建配置与部署参数示例 |
-| `recipes/` | 固定 Nixpkgs 版本的 tee-crypto、tee-vault 构建配方 |
-| `scripts/` | 监控器、工具、Linux 内核构建和统一镜像组装入口 |
-| `docs/` | 当前设计、测试和构建说明 |
-| `UPSTREAM_VERSIONS.json` | 上游版本、固定提交与适配范围 |
-| `SOURCE_MANIFEST.json` | 主仓库文件清单、SHA256 和子模块提交引用 |
+| `src/macrn/` | r3 M-mode 监控器、SG2044、PMP、共享I/O、生命周期与控制工具源码 |
+| `runtime/host-driver/` | `tvm-driver`、历史参数模块及`tvm-control`源码 |
+| `runtime/zion-compat/` | Zion命令前端、回环SSH代理、安装器及本地单元检查 |
+| `runtime/planb-runtime.sh` | 原生Guest与后端生命周期控制 |
+| `runtime/run-case.sh`、`runtime/guest/` | 原测例入口、数据库负载及Guest初始化脚本 |
+| `src/asterinas/`、`src/zion-enclave/` | Asterinas移植源码和Zion Enclave组件源码 |
+| `src/linux-cvm-kernel/` | 可选Linux 6.12.35源码构建示例的固定Git子模块 |
+| `scripts/`、`configs/` | 参数化构建、参考initramfs转换、统一载荷组装及配置 |
+| `SOURCE_MANIFEST.json`、`UPSTREAM_VERSIONS.json` | 源码哈希、子模块引用与组件来源 |
 
-## 安装到测试的使用说明
+r3参考Linux CVM内核为 **6.6.88+**，内核与匹配的Guest模块、用户态需作为外部输入准备。仓库内可选Linux 6.12.35子模块不能重现该参考二进制；具体边界见[构建说明](docs/build.md)。
 
-首次使用从 **[部署指南](docs/getting-started.md)** 开始，依次准备环境、Guest 身份与镜像输入，在目标 Host 安装工具和兼容层，再执行功能测试。
-
-路径可通过安装参数配置，默认值见 [部署配置示例](configs/deployment.env.example)。目标地址由使用者指定，不依赖开发者的机器、用户名或目录。
-
-## 下载上游依赖
-
-Linux 使用标准 Git 子模块，GitHub 页面会显示 `src/linux-cvm-kernel @ 783cd2c`，可跳转到上游固定版本。下载本项目后，在项目根目录初始化：
+在仓库根目录检查源码和Host前端：
 
 ```bash
-bash scripts/init-submodules.sh
+python3 -B scripts/check-source.py
+python3 -B -m unittest discover -s runtime/zion-compat -p 'test_*.py'
 ```
 
-固定版本为 [Linux v6.12.35 / 783cd2c3dca8](https://github.com/gregkh/linux/tree/783cd2c3dca8b6c434e955b84c20c8940588dc68)。内核配置单独保留在 `configs/linux-cvm.config`。
-
-## 快速检查
-
-在源码目录执行：
-
-```bash
-python3 scripts/check-source.py
-PYTHONDONTWRITEBYTECODE=1 python3 -B runtime/zion-compat/test_compat.py
-PYTHONDONTWRITEBYTECODE=1 python3 -B runtime/zion-compat/test_install.py
-```
-
-这些检查不连接服务器、不切换 Guest、不触发篡改注入。
-
-## 构建入口
-
-先准备 Linux 构建环境和 RISC-V 交叉工具链，再执行：
+构建r3监控器及工具：
 
 ```bash
 export CROSS_COMPILE=riscv64-linux-gnu-
-bash scripts/init-submodules.sh
 bash scripts/build-monitor.sh
 bash scripts/build-tools.sh
-bash scripts/build-linux-cvm.sh
 ```
 
-输出位于 `build/`。Asterinas、Enclave、应用和 initramfs 依赖各自工具链及用户态依赖，完整说明见 [构建说明](docs/build.md)。源码目录不包含已编译固件、OS 镜像、工具链安装包或实验凭据；组装新固件时需另外准备 VM0 载荷、板级 DTB、两种 Guest 内核及 initramfs。
+Host模块还需与目标管理Linux完全匹配的内核构建目录，运行`bash scripts/build-host-driver.sh`前设置`KERNEL_BUILD_DIR`。统一载荷组装需准备VM0、Asterinas和Linux CVM各自的内核、initramfs、启动参数及有效板级DTB。
 
-## 设计与测试
-
-- [当前设计与十项指标评估](docs/design.md)
-- [安装、部署与测试](docs/getting-started.md)
-- [Zion 原命令测试手册](docs/testing.md)
-- [构建与外部输入](docs/build.md)
-- [代码来源与适配范围](docs/code-origin.md)
-- [组件来源与许可证](THIRD_PARTY.md)
-
-测试在管理 Linux 本机执行。H 扩展指标 0004 需要 H 平台；本项目的无 H 执行机制不能替代该项硬件验证。
-
-## 上传内容范围
-
-仓库收录源码、配置、脚本、必要资源及使用文档。构建输出、运行状态、日志、私钥和随机种子应保存在本地目录，不加入 Git。
-
-各组件保留其原有许可证和版权声明，详见 `THIRD_PARTY.md`。
+仓库保存源码、配置和面向首次使用者的文档。构建输出、镜像、身份文件、运行状态及实测日志保留在本地，不加入Git。各组件保留原有版权与许可证，见[组件来源](THIRD_PARTY.md)。

@@ -26,6 +26,8 @@
 #include <asm/static_vm.h>
 #include <asm/planb_enclave.h>
 #include <asm/planb_runtime.h>
+#include <asm/planb_console.h>
+#include <asm/planb_abi.h>
 #include "sbi.h"
 #include "rpmi.h"
 #include "tee.h"
@@ -37,6 +39,40 @@
 static spinlock_t guest_console_lock;
 static char guest_lines[2][512];
 static unsigned int guest_line_size[2];
+#ifdef CONFIG_PLAN_B_SERVICES
+/* One producer (VM1's Hart), immutable published prefix, read-only VM0 MMIO.
+ * No UART wait or cross-Hart console lock is entered by protected VM output.
+ */
+static char planb_console_data[PLANB_CONSOLE_BYTES];
+static uint32_t planb_console_used, planb_console_lost, planb_console_gen = 1U;
+
+void planb_console_putchar(char ch)
+{
+ uint32_t pos = __atomic_load_n(&planb_console_used, __ATOMIC_RELAXED);
+ if (pos < PLANB_CONSOLE_BYTES) {
+  planb_console_data[pos] = ch;
+  __atomic_store_n(&planb_console_used, pos + 1U, __ATOMIC_RELEASE);
+ } else __atomic_add_fetch(&planb_console_lost, 1U, __ATOMIC_RELAXED);
+}
+void planb_console_reset(void)
+{
+ /* Called on the stopped VM1 Hart, before a new image can produce output. */
+ __atomic_store_n(&planb_console_used, 0U, __ATOMIC_RELEASE);
+ __atomic_store_n(&planb_console_lost, 0U, __ATOMIC_RELEASE);
+ __atomic_add_fetch(&planb_console_gen, 1U, __ATOMIC_RELEASE);
+}
+uint32_t planb_console_size(void) { return __atomic_load_n(&planb_console_used, __ATOMIC_ACQUIRE); }
+uint32_t planb_console_dropped(void) { return __atomic_load_n(&planb_console_lost, __ATOMIC_RELAXED); }
+uint32_t planb_console_generation(void) { return __atomic_load_n(&planb_console_gen, __ATOMIC_ACQUIRE); }
+uint32_t planb_console_word(uint32_t offset)
+{
+ uint32_t used = planb_console_size(), value = 0U, i;
+ if (offset >= PLANB_CONSOLE_BYTES) return 0U;
+ for (i = 0; i < 4U && offset + i < used; i++)
+  value |= (uint32_t)(uint8_t)planb_console_data[offset + i] << (8U * i);
+ return value;
+}
+#endif
 #ifdef CONFIG_PLAN_B_RUNTIME
 void planb_guest_console_reset(uint16_t id)
 {
@@ -45,6 +81,9 @@ void planb_guest_console_reset(uint16_t id)
  memset(guest_lines[id], 0, sizeof(guest_lines[id]));
  guest_line_size[id] = 0;
  spin_unlock_irqrestore(&guest_console_lock, flags);
+#ifdef CONFIG_PLAN_B_SERVICES
+ if (id == 1U) planb_console_reset();
+#endif
 }
 #endif
 static void guest_putchar(struct acrn_vcpu *vcpu, char ch)
@@ -52,6 +91,12 @@ static void guest_putchar(struct acrn_vcpu *vcpu, char ch)
 	uint16_t id = vcpu->vm->vm_id;
 	unsigned int i;
 	uint64_t flags;
+#ifdef CONFIG_PLAN_B_SERVICES
+	if (id == 1U) {
+		planb_console_putchar(ch);
+		return;
+	}
+#endif
 	spin_lock_irqsave(&guest_console_lock, &flags);
 	guest_lines[id][guest_line_size[id]++] = ch;
 	if (ch == '\n' || guest_line_size[id] == sizeof(guest_lines[id])) {

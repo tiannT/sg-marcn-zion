@@ -15,10 +15,10 @@ class Handler(socketserver.BaseRequestHandler):
     def handle(self):
         try:
             status = runtime_status(config)
-            if status['state'] != 1 or status['image'] not in (1, 2):
+            if status['state'] != 1 or status['image'] not in (1, 2, 3):
                 return
             refresh_known(root, status)
-            address = {1: '10.0.2.15', 2: '10.0.3.15'}[status['image']]
+            address = {1: '10.0.2.15', 2: '10.0.2.15', 3: '10.0.2.15'}[status['image']]
             with socket.create_connection((address, 22), timeout=5) as guest:
                 self.request.settimeout(10)
                 guest.settimeout(10)

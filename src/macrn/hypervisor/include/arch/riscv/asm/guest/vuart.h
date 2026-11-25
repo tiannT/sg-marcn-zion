@@ -59,4 +59,5 @@ void vuart_toggle_intr(struct acrn_vuart *vu);
 
 void vuart_putchar(struct acrn_vuart *vu, char ch);
 char vuart_getchar(struct acrn_vuart *vu);
+bool vuart_try_getchar(struct acrn_vuart *vu, char *ch);
 #endif /* __RISCV_VUART_H__ */

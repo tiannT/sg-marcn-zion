@@ -20,6 +20,7 @@
 #else
 #include <asm/guest/vuart.h>
 #include <asm/sg2044_static.h>
+#include <asm/current.h>
 #endif
 #include <dbg_cmd.h>
 
@@ -137,6 +138,21 @@ static void vuart_console_tx_chars(struct acrn_vuart *vu)
 {
 	uint64_t flags;
 	char c;
+#ifdef CONFIG_PLAN_B_SERVICES
+	uint32_t budget = 256U;
+
+	/* A Guest must not make its management Hart wait in the console timer.
+	 * Never hold the global TX lock while waiting for a remote UART lock.
+	 */
+	local_irq_save(&flags);
+	if (!spinlock_try_obtain(&console_tx_lock)) {
+		local_irq_restore(flags);
+		return;
+	}
+	while (budget-- && vuart_try_getchar(vu, &c) && c != (char)(-1))
+		printf("%c", c);
+	spinlock_irqrestore_release(&console_tx_lock, flags);
+#else
 
 	/* Timer and VM-exit callers must not reorder bytes dequeued from
 	 * the same FIFO on different physical harts.
@@ -148,6 +164,7 @@ static void vuart_console_tx_chars(struct acrn_vuart *vu)
 		c = vuart_getchar(vu);
 	}
 	spinlock_irqrestore_release(&console_tx_lock, flags);
+#endif
 }
 
 void console_flush_vuart(struct acrn_vuart *vu)
@@ -177,6 +194,12 @@ static struct acrn_vuart *vuart_console_active(void)
 static void console_timer_callback(__unused void *data)
 {
 	struct acrn_vuart *vu;
+#ifdef CONFIG_PLAN_B_SERVICES
+	/* The dedicated Guest Hart runs untrusted workload; it must not own
+	 * the management console timer or the global physical-console lock.
+	 */
+	if (get_pcpu_id() != BSP_CPU_ID) return;
+#endif
 
 #if defined(CONFIG_STATIC_DUAL) && defined(CONFIG_PLATFORM_SG2044)
 	/* Sample while Linux is waiting silently, before its I/O timeout.

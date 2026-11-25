@@ -37,3 +37,8 @@ Linux CVM 使用 Linux 6.12.35 内核主体，不能称为本项目自行编写�
 本源码目录保存当前实际参与构建的代码：CVM 安全语义的适配实现位于 `src/macrn/hypervisor/arch/riscv/` 的 `planb_runtime.c`、`planb_io.c`、`static_vm.c` 等文件；复用的 Guest Enclave 组件位于 `src/zion-enclave/`。原 Zion 的 Host/Guest Linux 分支和 H/KVM 后端没有整体混入当前源码目录。
 
 版本与提交信息见 [UPSTREAM_VERSIONS.json](../UPSTREAM_VERSIONS.json)；项目文件及子模块引用由 [SOURCE_MANIFEST.json](../SOURCE_MANIFEST.json) 固定。实际适配源码和构建配置均属于版本记录的一部分。
+
+
+## r3更新
+
+当前监控器和Host驱动源自r3交付包。Host原生tvm驱动、历史kvm参数兼容和独立image3的范围见[r3源码说明](r3-source.md)；这不等于移植了物理H/KVM后端。参考Linux6.6.88+与匹配用户态是外部输入，仓库Linux6.12.35子模块为可选示例，不能混称同一内核。

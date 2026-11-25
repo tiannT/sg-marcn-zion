@@ -34,6 +34,7 @@
 #include <asm/guest/vuart.h>
 #include <asm/guest/vm.h>
 #include <logmsg.h>
+#include <asm/planb_console.h>
 
 #define init_vuart_lock(vu)	spinlock_init(&((vu)->lock))
 #define obtain_vuart_lock(vu, flags)	spinlock_irqsave_obtain(&((vu)->lock), &(flags))
@@ -112,6 +113,19 @@ char vuart_getchar(struct acrn_vuart *vu)
 	c = fifo_getchar(&vu->txfifo);
 	release_vuart_lock(vu, rflags);
 	return c;
+}
+
+bool vuart_try_getchar(struct acrn_vuart *vu, char *ch)
+{
+	uint64_t flags;
+	local_irq_save(&flags);
+	if (!spinlock_try_obtain(&vu->lock)) {
+		local_irq_restore(flags);
+		return false;
+	}
+	*ch = fifo_getchar(&vu->txfifo);
+	release_vuart_lock(vu, flags);
+	return true;
 }
 
 static inline void init_fifo(struct acrn_vuart *vu)
@@ -264,6 +278,9 @@ static void write_reg(struct acrn_vuart *vu, uint16_t reg, uint8_t value_u8)
 				fifo_putchar(&vu->rxfifo, (char)value_u8);
 				vu->lsr |= LSR_OE;
 			} else {
+#ifdef CONFIG_PLAN_B_SERVICES
+				if (vu->vm->vm_id == 1U) planb_console_putchar((char)value_u8);
+#endif
 				fifo_putchar(&vu->txfifo, (char)value_u8);
 			}
 			vu->thre_int_pending = true;

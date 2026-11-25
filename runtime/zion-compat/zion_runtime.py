@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Original Zion test command family backed by the real Plan B runtime."""
 import fcntl
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -10,13 +11,14 @@ import sys
 import time
 from common import atomic, boot_id, load, process_start, proxy_live, refresh_known, runtime_status, save
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[1]
+TAMPER_PARAMETER = Path('/sys/module/kvm/parameters/zion_vcpu_tamper')
 HELP = '''Usage: ./zion-runtime.sh select [linux|asterinas]|init|protect|guest|linux|enclave|asterinas|status|stop
        ./zion-runtime.sh tamper-s3 [0|1|status]
-Backend: macrn-planb (SG2044 no-H). Run on the management Host as root.
-SSH: ssh -p 10022 root@127.0.0.1 (configure the local Guest identity at installation).
-enclave uses the unified Linux CVM image. No QEMU PID or fake /dev/tvm.
-0008 uses tamper-s3 instead of the unavailable KVM sysfs parameter.
+Backend: SG2044 native ABI1. Run commands locally on the management Host.
+SSH: ssh -p 10022 root@127.0.0.1 (existing local test identity configured).
+enclave starts the reference Linux in a separate mode without virtio-blk.
+0007 uses the real /dev/tvm driver; 0008 accepts the original KVM parameter path.
 '''
 
 
@@ -66,15 +68,18 @@ class Compat:
         return int(match[1]), r.stdout
 
     def tamper_state(self):
-        value = load(self.state / 'tamper.json', {'phase': 'idle', 'boot_id': boot_id()})
-        if value.get('boot_id') != boot_id():
-            value = {'phase': 'idle', 'boot_id': boot_id()}
-        if value['phase'] == 'submitted':
-            log = Path(self.config.get('runtime_dir', '/run/planb-runtime')) / f"backend-{value['epoch']}.log"
-            content = log.read_text() if log.is_file() else ''
-            if len(re.findall(r'^PLANB_INJECTED_S3 ', content, re.M)) == 1 and self.warning_count()[0] == 1:
-                value['phase'] = 'consumed'
-                save(self.state / 'tamper.json', value)
+        info = self.native_info()
+        value = dict(phase='consumed' if info['used'] else 'armed' if info['tamper'] else 'idle',
+                     boot_id=boot_id(), parameter=info['tamper'])
+        save(self.state / 'tamper.json', value)
+        return value
+
+    def native_info(self):
+        r = subprocess.run([str(self.tools/'tvm-control'),'--info'],capture_output=True,text=True,timeout=10)
+        if r.returncode:
+            raise RuntimeError('Native tvm driver unavailable: '+r.stderr.strip())
+        value=json.loads(r.stdout)
+        if value.get('abi') != 1:raise RuntimeError('Native tvm compatibility ABI mismatch')
         return value
 
     def ensure_proxy(self):
@@ -82,7 +87,7 @@ class Compat:
             return
         log = self.logdir / f'ssh-proxy-{time.time_ns()}.log'
         with log.open('ab') as output:
-            process = subprocess.Popen([sys.executable, str(self.root / 'compat/portproxy.py'), str(self.root)],
+            process = subprocess.Popen([self.config.get('python',sys.executable), str(self.root / 'compat/portproxy.py'), str(self.root)],
                                        stdin=subprocess.DEVNULL, stdout=output, stderr=output,
                                        start_new_session=True)
         save(self.state / 'proxy.json', {'pid': process.pid, 'start': process_start(process.pid), 'boot_id': boot_id()})
@@ -96,13 +101,13 @@ class Compat:
 
     def ssh(self, command, timeout=12):
         value = runtime_status(self.config)
-        address = {1: '10.0.2.15', 2: '10.0.3.15'}.get(value['image'])
+        address = {1: '10.0.2.15', 2: '10.0.2.15', 3: '10.0.2.15'}.get(value['image'])
         if value['state'] != 1 or address is None:
             raise RuntimeError('Guest is not running')
         argv = ['ssh', '-i', self.config['key'], '-o', 'IdentitiesOnly=yes',
                 '-o', 'IdentityAgent=none', '-o', 'ForwardAgent=no', '-o', 'BatchMode=yes',
                 '-o', 'StrictHostKeyChecking=accept-new', '-o', 'ConnectTimeout=3',
-                '-o', f'UserKnownHostsFile={self.state}/direct-{value["epoch"]}.known',
+                '-o', f'UserKnownHostsFile={self.state}/direct-{boot_id()}-{value["epoch"]}.known',
                 'root@' + address, command]
         return subprocess.run(argv, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=timeout)
 
@@ -122,11 +127,12 @@ class Compat:
         raise RuntimeError('Guest SSH did not become ready: ' + last)
 
     def start(self, profile, inject=False):
-        target = {'asterinas': 1, 'linux': 2}[profile]
+        target = {'asterinas': 1, 'linux': 2, 'enclave': 3}[profile]
         initial = runtime_status(self.config)
         action = 'start' if initial['state'] == 1 and initial['image'] == target and not inject else 'switch'
         env = os.environ.copy()
         env['PLANB_TEST_TAMPER_S3'] = '1' if inject else '0'
+        env['PLANB_BACKEND_LOG_DIR'] = str(self.logdir)
         # The existing controller checks live Enclaves, serializes stop/clean/reload,
         # and validates backend PID/start-time/boot-ID before terminating anything.
         r = subprocess.run([str(self.tools / 'planb-runtime.sh'), action, profile],
@@ -154,78 +160,80 @@ class Compat:
         r = subprocess.run(['sha256sum', '-c', 'SHA256SUMS'], cwd=self.tools, capture_output=True, text=True)
         print(r.stdout, end='')
         if r.returncode:
-            raise RuntimeError('Runtime tool hashes do not match')
+            raise RuntimeError('Underlying P4R3 tool hashes do not match')
         runtime_status(self.config)
+        if not Path('/dev/tvm').exists():
+            self.tool(['insmod',self.tools/'tvm-driver.ko'])
+        info=self.native_info()
+        parameter=TAMPER_PARAMETER
+        if not parameter.exists():
+            if Path('/sys/module/kvm').exists():
+                raise RuntimeError('Existing KVM module has no Zion parameter; no module was replaced')
+            self.tool(['insmod',self.tools/'kvm.ko'])
         abi = Path('/proc/device-tree/chosen/macrn,pmp-live-test-abi').read_bytes()
         if abi != b'\0\0\0\2':
             raise RuntimeError('PMP fixture ABI mismatch')
-        atomic(self.state / 'protected-addr', self.config['pmp_fixture'] + '\n')
+        atomic(self.state / 'protected-addr', info['protected_addr'] + '\n')
+        self.tool([self.tools/'tvm-control','tvm',str(self.config.get('pool_pages',8192))])
         self.ensure_proxy()
-        print('[ZION INIT] READY backend=macrn-planb; real runtime ABI checked; no /dev/tvm used')
+        console = subprocess.run([str(self.tools / 'planb-backend'), '--console-info'], capture_output=True, text=True, timeout=10)
+        if console.returncode:
+            raise RuntimeError(console.stderr.strip() or 'Install matching 2044 console firmware')
+        print('[ZION INIT] READY backend=2044; runtime ABI verified')
         print('HOST_BOOT_ID=' + boot_id())
         print('LOG_DIR=' + str(self.logdir))
 
     def protect(self):
-        initial = runtime_status(self.config)
-        if self.tamper_state()['phase'] in ('armed', 'submitted'):
-            raise RuntimeError('0008 injection is pending; finish/cancel it before protect')
-        restore = initial['state'] == 1 and initial['image'] == 1
-        try:
-            print('[ZION MEMORY] Test profile=linux; fixed bidirectional PMP fixtures')
-            self.start('linux')
-            result = self.tool([self.tools / 'macrn-pmp-test', '--run'])
-            required = ['SIX_CASES_PASSED', 'PRIVATE_CANARIES_OK', 'LINUX_CONTEXT_RESTORED',
-                        'PEER_MONITOR_DELTAS=1,1,1']
-            address = re.search(r'peer_fixture=([0-9a-fA-F]+)', result.stdout)
-            if not all(text in result.stdout for text in required) or not address or \
-                    int(address[1], 16) != int(self.config['pmp_fixture'], 16):
-                raise RuntimeError('Incomplete real PMP evidence or fixture address mismatch')
-            atomic(self.state / 'protected-addr', hex(int(address[1], 16)) + '\n')
-            print('[ZION MEMORY] PASS: host/peer accesses blocked and recovered; private canaries retained')
-        finally:
-            if restore:
-                print('[ZION COMPAT] Restoring the prior Asterinas profile; VM1 RAM is reloaded')
-                self.start('asterinas')
+        info=self.native_info()
+        address=(self.state/'protected-addr').read_text().strip()
+        if int(address,16)!=int(info['protected_addr'],16):
+            raise RuntimeError('Protected address differs from monitor-owned fixture')
+        before=subprocess.run(['dmesg'],capture_output=True,text=True,check=True).stdout.splitlines()
+        result=self.tool([self.tools/'tvm-control','phys_memory_access','0',address],required=False)
+        after=subprocess.run(['dmesg'],capture_output=True,text=True,check=True).stdout.splitlines()
+        new='\n'.join(after[len(before):])
+        if not result.returncode:
+            raise RuntimeError('[ZION MEMORY] FAIL: host read returned successfully for '+address)
+        if 'protected-memory read blocked:' not in new or self.native_info()['faults']!=info['faults']+1:
+            raise RuntimeError('[ZION MEMORY] FAIL: access failed without real recovered PMP-fault evidence')
+        print('[ZION MEMORY] PASS: host read of '+address+' was blocked and recovered')
+        print('Confirm the matching [SM] TEE security check lines on the physical console.')
 
     def status(self, json_only=False):
         value = runtime_status(self.config)
         warnings, monitor = self.warning_count()
-        report = dict(backend='macrn-planb', host_boot_id=boot_id(), runtime=value,
+        report = dict(backend='2044', host_boot_id=boot_id(), runtime=value,
                       warnings=warnings, tamper=self.tamper_state(), ssh='127.0.0.1:10022',
                       proxy_running=proxy_live(self.root), protected_addr=self.config['pmp_fixture'])
         if json_only:
             print(json.dumps(report, ensure_ascii=False))
             return
-        print(json.dumps(report, ensure_ascii=False, indent=2))
-        print(monitor, end='')
-        backend_log = Path('/run/planb-runtime') / f'backend-{value["epoch"]}.log'
-        if backend_log.is_file():
-            print('Backend log: ' + str(backend_log))
-            print('\n'.join(backend_log.read_text().splitlines()[-20:]))
-        print('Console evidence: physical serial. The following is an actual SSH status query:')
-        if value['state'] == 1:
-            refresh_known(self.root, value)
-            r = self.ssh('export PATH=/usr/sbin:/usr/bin:/sbin:/bin; uname -a; cat /proc/version; '
-                         'ifconfig eth0; if test -b /dev/vda; then echo VIRTIO_BLOCK_PRESENT; fi')
-            print(r.stdout, end='')
-            if r.returncode:
-                print('GUEST_SSH_NOT_READY=' + r.stderr.strip())
+        transcript = subprocess.run([str(self.tools / 'planb-backend'), '--console'],
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30)
+        if transcript.returncode:
+            raise RuntimeError(transcript.stderr.decode(errors='replace').strip() or 'Guest console capture failed')
+        current = runtime_status(self.config)
+        if current['epoch'] != value['epoch'] or current['image'] != value['image']:
+            raise RuntimeError('Guest reloaded while reading its console; retry status')
+        log = self.state / 'cvm.log'
+        log.write_bytes(transcript.stdout)
+        log.chmod(0o600)
+        save(self.state / 'cvm-console.json', dict(host_boot_id=boot_id(), epoch=value['epoch'],
+             image=value['image'], bytes=len(transcript.stdout),
+             sha256=hashlib.sha256(transcript.stdout).hexdigest(), source='actual VM1 SBI and UART bytes'))
+        # Same public status behavior as Tianquan: tail -n 60 state/cvm.log.
+        subprocess.run(['tail', '-n', '60', str(log)], check=True)
 
     def tamper(self, argument):
         value = self.tamper_state()
         if argument == '1':
-            if self.warning_count()[0] != 0 or value['phase'] not in ('idle', 'cancelled'):
-                raise RuntimeError('First-alert window already used or an injection is pending; not rearmed')
-            value = {'phase': 'armed', 'boot_id': boot_id()}
-            save(self.state / 'tamper.json', value)
+            TAMPER_PARAMETER.write_text('1\n')
         elif argument == '0':
-            if value['phase'] == 'submitted':
-                raise RuntimeError('Injection already submitted to a running backend; cannot cancel it here')
-            value = {'phase': 'cancelled', 'boot_id': boot_id()}
-            save(self.state / 'tamper.json', value)
+            TAMPER_PARAMETER.write_text('0\n')
         elif argument != 'status':
             raise RuntimeError('Usage: ./zion-runtime.sh tamper-s3 [0|1|status]')
-        print('zion_vcpu_tamper=' + ('1' if value['phase'] in ('armed', 'submitted') else '0'))
+        value=self.tamper_state()
+        print('zion_vcpu_tamper=' + str(value['parameter']))
         print(json.dumps(value, ensure_ascii=False))
         print('warnings=' + str(self.warning_count()[0]))
 
@@ -261,7 +269,7 @@ def main(argv):
                 raise RuntimeError('Run ./zion-runtime.sh select first')
             command = selection.read_text().strip()
         if command in ('linux', 'enclave', 'asterinas') and len(argv) == 1:
-            profile = 'asterinas' if command == 'asterinas' else 'linux'
+            profile = command
             pending = c.tamper_state()
             if pending['phase'] == 'armed' and profile != 'linux':
                 raise RuntimeError('S3 injection is armed for Linux; cancel with tamper-s3 0 first')

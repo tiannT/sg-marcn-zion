@@ -60,7 +60,8 @@ stop_guest() {
     stop_backend
 }
 attach_backend() {
-    local profile=$1 tap_addr create= rc=0
+    local profile=$1 tap_addr create= rc=0 backend_log log_dir
+    local disk_args=()
     local tamper=()
     [[ ${PLANB_TEST_TAMPER_S3:-0} == 1 ]] && tamper=(--tamper-s3-once)
     backend_live || rc=$?
@@ -71,28 +72,45 @@ attach_backend() {
     fi
     case $profile in
         asterinas) tap_addr=10.0.2.2 ;;
-        linux) tap_addr=10.0.3.1 ;;
+        linux) tap_addr=10.0.2.2 ;;
+        enclave) tap_addr=10.0.2.2 ;;
         *) return 2 ;;
     esac
     [[ -d /sys/module/tun ]] || modprobe tun
-    [[ -e $run/$profile.img ]] || create=--create-disk
+    if [[ $profile == enclave ]]; then
+        disk_args=(--no-block)
+    else
+        [[ -e $run/$profile.img ]] || create=--create-disk
+        disk_args=(--disk "$run/$profile.img")
+        [[ -z $create ]] || disk_args+=(--create-disk)
+    fi
     # /run is RAM-backed; the backend requires a regular 512 MiB file and
     # creates only a new TAP. It rejects existing routes/interfaces/conflicts.
-    nohup "$backend" --disk "$run/$profile.img" ${create:+"$create"} \
+    log_dir=${PLANB_BACKEND_LOG_DIR:-$run}
+    [[ -d $log_dir && ! -L $log_dir && $(stat -c %u "$log_dir") == 0 ]] || {
+        echo 'Backend log directory must be root-owned and already exist.' >&2; return 1;
+    }
+    backend_log=$(mktemp "$log_dir/backend-$epoch-XXXXXX.log")
+    nohup "$backend" "${disk_args[@]}" \
         --tap pbrt0 --tap-address "$tap_addr" "${tamper[@]}" \
-        </dev/null >"$run/backend-$epoch.log" 2>&1 9>&- &
+        </dev/null >"$backend_log" 2>&1 9>&- &
     backend_pid=$!
     for ((i=0; i<100; ++i)); do
-        if grep -q PLANB_BACKEND_READY "$run/backend-$epoch.log"; then break; fi
-        kill -0 "$backend_pid" 2>/dev/null || { cat "$run/backend-$epoch.log" >&2; return 1; }
+        if grep -q PLANB_BACKEND_READY "$backend_log"; then break; fi
+        kill -0 "$backend_pid" 2>/dev/null || { cat "$backend_log" >&2; return 1; }
         sleep .1
     done
-    grep -q PLANB_BACKEND_READY "$run/backend-$epoch.log" || { kill -TERM "$backend_pid"; return 1; }
+    grep -q PLANB_BACKEND_READY "$backend_log" || { kill -TERM "$backend_pid"; return 1; }
+    if [[ -f $run/backend-$epoch.log && ! -L $run/backend-$epoch.log ]]; then
+        mv -- "$run/backend-$epoch.log" "$run/backend-$epoch.log.previous-$(date -u +%Y%m%dT%H%M%SZ)-$$"
+    fi
+    ln -s -- "$backend_log" "$run/.backend-log-$$"
+    mv -Tf -- "$run/.backend-log-$$" "$run/backend-$epoch.log"
     read -ra backend_stat < "/proc/$backend_pid/stat"
     printf '%s %s %s\n' "$backend_pid" "${backend_stat[21]}" "$boot_id" > "$run/backend.pid"
     printf '%s\n' "$epoch" > "$run/backend-epoch"
 }
-usage() { echo "Usage: $0 status | stop | start asterinas|linux | switch asterinas|linux" >&2; exit 2; }
+usage() { echo "Usage: $0 status | stop | start asterinas|linux|enclave | switch asterinas|linux|enclave" >&2; exit 2; }
 command=${1:-status}
 case $command in
     status)
@@ -107,7 +125,7 @@ case $command in
     start|switch)
         [[ $# == 2 ]] || usage
         profile=$2
-        case $profile in asterinas) wanted=1;; linux) wanted=2;; *) usage;; esac
+        case $profile in asterinas) wanted=1;; linux) wanted=2;; enclave) wanted=3;; *) usage;; esac
         read_status
         if [[ $command == switch && $state == 1 ]]; then
             stop_guest

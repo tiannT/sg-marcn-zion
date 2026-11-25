@@ -25,29 +25,29 @@ class CommandCompatibility(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
 
-    def test_tamper_rearm_is_rejected_and_cancel_does_not_reset_monitor(self):
-        with patch.object(self.c, 'warning_count', return_value=(0, '')), contextlib.redirect_stdout(io.StringIO()):
-            self.c.tamper('1')
-            with self.assertRaises(RuntimeError):
-                self.c.tamper('1')
+    def test_cancel_does_not_clear_consumed_native_window(self):
+        parameter = self.root / 'parameter'
+        parameter.write_text('0\n')
+        info = {'abi':1, 'used':1, 'tamper':0}
+        with patch.object(self.c, 'native_info', return_value=info), \
+             patch('zion_runtime.TAMPER_PARAMETER', parameter), \
+             patch.object(self.c, 'warning_count', return_value=(1, '')), \
+             contextlib.redirect_stdout(io.StringIO()):
             self.c.tamper('0')
-        with patch.object(self.c, 'warning_count', return_value=(1, '')):
-            with self.assertRaises(RuntimeError):
-                self.c.tamper('1')
-        self.assertEqual(load(self.root / 'state/tamper.json')['phase'], 'cancelled')
+        self.assertEqual(load(self.root / 'state/tamper.json')['phase'], 'consumed')
+        self.assertEqual(parameter.read_text(), '0\n')
 
-    def test_consumption_requires_one_actual_injection_and_monitor_warning(self):
-        state = {'phase': 'submitted', 'epoch': 4, 'boot_id': boot_id()}
-        save(self.root / 'state/tamper.json', state)
-        log = self.root / 'runtime/backend-4.log'
-        log.write_text('PLANB_BACKEND_READY\n')
-        with patch.object(self.c, 'warning_count', return_value=(1, '')):
-            self.assertEqual(self.c.tamper_state()['phase'], 'submitted')
-        log.write_text('PLANB_INJECTED_S3 sequence=3 value=0x5a494f4e\n')
-        with patch.object(self.c, 'warning_count', return_value=(0, '')):
-            self.assertEqual(self.c.tamper_state()['phase'], 'submitted')
-        with patch.object(self.c, 'warning_count', return_value=(1, '')):
+    def test_consumption_uses_native_state_without_backend_log(self):
+        with patch.object(self.c, 'native_info', return_value={'used':0,'tamper':1}):
+            self.assertEqual(self.c.tamper_state()['phase'], 'armed')
+        with patch.object(self.c, 'native_info', return_value={'used':1,'tamper':0}):
             self.assertEqual(self.c.tamper_state()['phase'], 'consumed')
+
+    def test_incompatible_native_abi_is_rejected(self):
+        result = subprocess.CompletedProcess([], 0, '{"abi":0}', '')
+        with patch('zion_runtime.subprocess.run', return_value=result):
+            with self.assertRaisesRegex(RuntimeError, 'ABI mismatch'):
+                self.c.native_info()
 
     def test_same_profile_is_not_reloaded_and_ambient_tamper_is_disabled(self):
         status = {'state': 1, 'image': 2, 'epoch': 4}

@@ -26,6 +26,7 @@
 #include <trace.h>
 #include <logmsg.h>
 #include <asm/planb_enclave.h>
+#include <asm/current.h>
 #include "vplic_priv.h"
 
 #define VPLIC_VERBOS	0
@@ -141,6 +142,30 @@ static void vplic_update(struct acrn_vplic *vplic)
 		vplic_set_intr(vcpu);
 	}
 }
+
+#ifdef CONFIG_PLAN_B_SERVICES
+void vplic_flush_deferred(struct acrn_vcpu *vcpu)
+{
+	struct acrn_vplic *vplic;
+	uint64_t flags;
+	uint32_t word, dirty, levels;
+	bool changed = false;
+	if (vcpu == NULL || vcpu->vm->vm_id != 1U ||
+	    get_pcpu_id() != pcpuid_from_vcpu(vcpu)) return;
+	vplic = vcpu_vplic(vcpu);
+	if (!vplic->enabled) return;
+	spin_lock_irqsave(&vplic->lock, &flags);
+	for (word = 0; word < PLIC_NUM_FIELDS; word++) {
+		dirty = __atomic_exchange_n(&vplic->deferred_dirty[word], 0U, __ATOMIC_ACQ_REL);
+		if (!dirty) continue;
+		levels = __atomic_load_n(&vplic->deferred_levels[word], __ATOMIC_ACQUIRE);
+		vplic->regs.pending[word] = (vplic->regs.pending[word] & ~dirty) | (levels & dirty);
+		changed = true;
+	}
+	if (changed) vplic_update(vplic);
+	spin_unlock_irqrestore(&vplic->lock, flags);
+}
+#endif
 
 static bool offset_between(uint32_t offset, uint32_t base, uint32_t num)
 {
@@ -294,6 +319,10 @@ vplic_reset(struct acrn_vplic *vplic, const struct acrn_vplic_ops *ops, enum res
 
         regs = &(vplic->regs);
         memset((void *)regs, 0U, sizeof(struct plic_regs));
+#ifdef CONFIG_PLAN_B_SERVICES
+	memset(vplic->deferred_levels, 0, sizeof(vplic->deferred_levels));
+	memset(vplic->deferred_dirty, 0, sizeof(vplic->deferred_dirty));
+#endif
 
         vplic->ops = ops;
 }
@@ -307,6 +336,22 @@ void vplic_accept_intr(struct acrn_vcpu *vcpu, uint32_t vector, bool level)
 
 	if (!vplic->enabled)
 		return;
+#ifdef CONFIG_PLAN_B_SERVICES
+	if (vcpu->vm->vm_id == 1U && vector < PLIC_NUM_SOURCES) {
+		uint32_t word = vector >> 5;
+		uint32_t bit = 1U << (vector & 31U);
+		/* Both asserts and deasserts use the same ordered shadow levels.
+		 * The owner applies the latest level, so an ACK cannot be undone by
+		 * an older cross-Hart notification. Physical VM0 IRQs stay unchanged.
+		 */
+		if (level) __atomic_fetch_or(&vplic->deferred_levels[word], bit, __ATOMIC_RELEASE);
+		else __atomic_fetch_and(&vplic->deferred_levels[word], ~bit, __ATOMIC_RELEASE);
+		__atomic_fetch_or(&vplic->deferred_dirty[word], bit, __ATOMIC_RELEASE);
+		if (get_pcpu_id() == pcpuid_from_vcpu(vcpu)) vplic_flush_deferred(vcpu);
+		else vcpu_make_request(vcpu, ACRN_REQUEST_EXTINT);
+		return;
+	}
+#endif
 	spin_lock_irqsave(&vplic->lock, &flags);
 	if (vector < PLIC_NUM_SOURCES) {
 		if (level)
@@ -409,6 +454,10 @@ void vplic_init(struct acrn_vm *vm)
 		(uint64_t)vplic->plic_base + DEFAULT_PLIC_SIZE, (void *)vplic, false);
 
 	memset(&vplic->regs, 0U, sizeof(struct plic_regs));
+#ifdef CONFIG_PLAN_B_SERVICES
+	memset(vplic->deferred_levels, 0, sizeof(vplic->deferred_levels));
+	memset(vplic->deferred_dirty, 0, sizeof(vplic->deferred_dirty));
+#endif
 	vplic->enabled = 1;
 #if defined(CONFIG_STATIC_DUAL) && defined(CONFIG_PLATFORM_SG2044)
 	if (is_service_vm(vm))

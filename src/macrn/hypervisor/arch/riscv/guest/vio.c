@@ -253,7 +253,23 @@ int32_t mmio_access_vmexit_handler(struct acrn_vcpu *vcpu)
 #endif
 
 #ifdef CONFIG_STATIC_DUAL
+	/* Tianquan's ESWIN kernel maps DIE0 cached PA 0x80000000 to
+	 * uncached PA 0xc000000000 over a 32-GiB window. Resolve only VM1
+	 * devices that
+	 * are already explicitly emulated; never turn a RAM/protected alias
+	 * into a physical proxy access or change VM0's native device map.
+	 */
+	if (vcpu->vm->vm_id == 1 && gpa >= 0xc000000000UL &&
+	    gpa - 0xc000000000UL < 0x800000000UL) {
+		uint64_t device = gpa - 0xc000000000UL + 0x80000000UL;
+		if (static_vm_emulated_mmio(1, device, 8)) gpa = device;
+	}
 	if (!static_vm_emulated_mmio(vcpu->vm->vm_id, gpa, 8)) {
+		if (vcpu->vm->vm_id == 0 && gpa >= static_vms[1].base &&
+		    gpa - static_vms[1].base < static_vms[1].size) {
+			pr_warn("[SM] TEE security check: the hypervisor is trying to r/w the protected region");
+			pr_warn("[SM] TEE security check: protected access blocked, address=0x%lx", gpa);
+		}
 		if (gpa >= 0x80000000UL && gpa < static_ddr_end)
 			pr_warn("[STATIC] VM%u DENIED_PRIVATE_ACCESS address=%lx", vcpu->vm->vm_id, gpa);
 		else

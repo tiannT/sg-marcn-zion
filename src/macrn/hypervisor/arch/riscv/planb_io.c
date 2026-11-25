@@ -9,7 +9,9 @@
 #include <asm/guest/vplic.h>
 #include <asm/static_vm.h>
 #include <asm/planb_io.h>
+#include <asm/planb_runtime.h>
 #include <asm/planb_enclave.h>
+#include <asm/planb_console.h>
 #include <io_req.h>
 #include <logmsg.h>
 #include <libfdt.h>
@@ -60,6 +62,7 @@ static spinlock_t io_lock;
 static struct acrn_vcpu *guest_vcpu;
 static uint64_t next_sequence;
 static uint32_t completed, warnings;
+static uint32_t busy_doorbells;
 static bool io_online = true;
 
 static bool private_buffer(uint64_t address, uint64_t length)
@@ -95,10 +98,17 @@ bool planb_io_busy_range(uint64_t address, uint64_t length)
 
 bool planb_io_range(uint16_t vm_id, uint64_t address, uint64_t size)
 {
-	uint64_t base = vm_id ? PLANB_BLK_MMIO : PLANB_CTL_MMIO;
-	uint64_t length = vm_id ? 0x2000U : 0x1000U;
-	return vm_id < 2 && size && address >= base && address - base < length &&
-		size <= length - (address - base);
+ uint64_t base, length;
+ if (vm_id == 1 && !planb_runtime_block_enabled())
+  return size && address >= PLANB_NET_MMIO && address - PLANB_NET_MMIO < 0x1000U &&
+   size <= 0x1000U - (address - PLANB_NET_MMIO);
+ if (vm_id == 0 && size && address >= PLANB_CONSOLE_MMIO &&
+     address - PLANB_CONSOLE_MMIO < PLANB_CONSOLE_BYTES &&
+     size <= PLANB_CONSOLE_BYTES - (address - PLANB_CONSOLE_MMIO)) return true;
+ base = vm_id ? PLANB_BLK_MMIO : PLANB_CTL_MMIO;
+ length = vm_id ? 0x2000U : 0x1000U;
+ return vm_id < 2 && size && address >= base && address - base < length &&
+  size <= length - (address - base);
 }
 
 static void interrupt_device(struct device *device, uint32_t bits)
@@ -198,7 +208,7 @@ static void finish(struct pending *request, uint32_t written)
 		&element, sizeof(element));
 	queue->produced++;
 	__atomic_store_n((uint16_t *)(queue->used + 2U), queue->produced, __ATOMIC_RELEASE);
-	completed++;
+	__atomic_add_fetch(&completed, 1U, __ATOMIC_RELAXED);
 	interrupt_device(request->device, 1U);
 }
 
@@ -339,7 +349,8 @@ static void check_saved_registers(struct planb_slot *shared, const struct planb_
 	for (i = 0; i < 9U; i++) {
 		if (!snapshot->saved_s2_s10[i]) continue;
 		if (!warnings) {
-			warnings = 1;
+			__atomic_store_n(&warnings, 1U, __ATOMIC_RELAXED);
+			planb_runtime_tamper_detected();
 			pr_warn("[ZION VCPU ALERT] hart=1 source=HOST-SHARED-CHANNEL register=S%u expected=0x0 observed=0x%lx",
 				i + 2U, snapshot->saved_s2_s10[i]);
 			pr_warn("[ZION VCPU ALERT] classification=SUSPECTED-TAMPER-OR-ABI-MISMATCH; private saved state is retained");
@@ -548,23 +559,57 @@ static int32_t control_access(struct io_request *request, __unused void *context
 {
 	struct acrn_mmio_request *mmio = &request->reqs.mmio_request;
 	uint32_t offset = (uint32_t)(mmio->address - PLANB_CTL_MMIO);
-	uint64_t flags;
+	uint64_t flags, ticket;
 	unsigned int i;
 	if (mmio->size != 4U || (offset & 3U)) return -EINVAL;
-	spin_lock_irqsave(&io_lock, &flags);
-	if (mmio->direction == ACRN_IOREQ_DIR_WRITE) {
-		if (offset == 8U && io_online) for (i = 0; i < 3U; i++) consume_response(&pending[i]);
-	} else switch (offset) {
+	/* Status and immutable console metadata must remain readable even if
+	 * VM1 is delayed while owning the queue lock. VM0 has only one Hart.
+	 */
+	if (mmio->direction == ACRN_IOREQ_DIR_READ) {
+	 switch (offset) {
 	case 0: mmio->value = (uint32_t)PLANB_MAGIC; break;
 	case 4: mmio->value = PLANB_MAGIC >> 32; break;
 	case 12: mmio->value = PLANB_ABI; break;
 	case 16: mmio->value = (uint32_t)PLANB_SLOT_BLK; break;
 	case 20: mmio->value = PLANB_SLOT_BLK >> 32; break;
-	case 24: mmio->value = warnings; break;
-	case 28: mmio->value = completed; break;
+	case 24: mmio->value = __atomic_load_n(&warnings, __ATOMIC_RELAXED); break;
+	case 28: mmio->value = __atomic_load_n(&completed, __ATOMIC_RELAXED); break;
+	case 32: mmio->value = PLANB_FEATURE_MAGIC; break;
+	case 36: mmio->value = PLANB_FEATURE_CONSOLE | PLANB_FEATURE_NONBLOCK_IO; break;
+	case 40: mmio->value = planb_console_size(); break;
+	case 44: mmio->value = planb_console_dropped(); break;
+	case 48: mmio->value = planb_console_generation(); break;
+	case 52: mmio->value = __atomic_load_n(&busy_doorbells, __ATOMIC_RELAXED); break;
+	case 56: mmio->value = PLANB_CONSOLE_BYTES; break;
 	default: mmio->value = 0; break;
+	 }
+	 return 0;
 	}
+	if (offset != 8U) return -EINVAL;
+	/* A delayed Guest must not make the management Hart spin forever.
+	 * Failed attempts do not enqueue a ticket or consume a response. The
+	 * matching backend retries the doorbell on its normal bounded poll.
+	 */
+	local_irq_save(&flags);
+	ticket = __atomic_load_n(&io_lock.tail, __ATOMIC_ACQUIRE);
+	if (!__atomic_compare_exchange_n(&io_lock.head, &ticket, ticket + 1U,
+		false, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED)) {
+		__atomic_add_fetch(&busy_doorbells, 1U, __ATOMIC_RELAXED);
+		local_irq_restore(flags);
+		return 0;
+	}
+	if (io_online) for (i = 0; i < 3U; i++) consume_response(&pending[i]);
 	spin_unlock_irqrestore(&io_lock, flags);
+	return 0;
+}
+
+static int32_t console_access(struct io_request *request, __unused void *context)
+{
+	struct acrn_mmio_request *mmio = &request->reqs.mmio_request;
+	uint64_t offset = mmio->address - PLANB_CONSOLE_MMIO;
+	if (mmio->direction != ACRN_IOREQ_DIR_READ || mmio->size != 4U ||
+	    (offset & 3U) || offset >= PLANB_CONSOLE_BYTES) return -EINVAL;
+	mmio->value = planb_console_word((uint32_t)offset);
 	return 0;
 }
 
@@ -586,6 +631,8 @@ void planb_io_init(struct acrn_vm *vm)
 		pending[2].shared = (void *)PLANB_SLOT_RX;
 		register_mmio_emulation_handler(vm, control_access, PLANB_CTL_MMIO,
 			PLANB_CTL_MMIO + 0x1000U, NULL, false);
+		register_mmio_emulation_handler(vm, console_access, PLANB_CONSOLE_MMIO,
+			PLANB_CONSOLE_MMIO + PLANB_CONSOLE_BYTES, NULL, false);
 	} else if (vm->vm_id == 1) {
 		guest_vcpu = &vm->hw.vcpu[0];
 		register_mmio_emulation_handler(vm, virtio_access, PLANB_BLK_MMIO,
@@ -627,8 +674,10 @@ int planb_io_add_fdt(void *dtb)
 		}
 	}
 	if (!phandle) return -EINVAL;
-	ret = add_device_fdt(dtb, "virtio_mmio@93000000", PLANB_BLK_MMIO, PLANB_BLK_IRQ, phandle);
-	if (ret) return ret;
+	if (planb_runtime_block_enabled()) {
+		ret = add_device_fdt(dtb, "virtio_mmio@93000000", PLANB_BLK_MMIO, PLANB_BLK_IRQ, phandle);
+		if (ret) return ret;
+	}
 	return add_device_fdt(dtb, "virtio_mmio@93001000", PLANB_NET_MMIO, PLANB_NET_IRQ, phandle);
 }
 #endif

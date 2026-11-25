@@ -14,9 +14,11 @@ bash scripts/build-tools.sh
 
 监控器配置为 SG2044、两个 Hart、Linux 静态域入口，启用 `LIVE_PMP_TEST`、`PLAN_B_SERVICES`、`PLAN_B_ENCLAVE`、`PLAN_B_RUNTIME`。构建入口在 `src/macrn/tools/sg2044/build.py`，包含镜像布局检查和 H 指令扫描。输出位于 `build/monitor/`。
 
-运行工具输出到 `build/tools/`，包括 `planb-guestctl`、`planb-backend`、`macrn-pmp-test` 和 `planb-runtime.sh`。部署时同时使用本次构建的固件和工具，并保留对应的版本、配置及哈希。
+运行工具输出到 `build/tools/`，包括 `planb-guestctl`、`planb-backend`、`macrn-pmp-test`、`tvm-control` 和 `planb-runtime.sh`。部署时同时使用本次构建的固件和工具，并保留对应的版本、配置及哈希。
 
-## 2. Linux CVM
+## 2. 可选Linux源码构建示例
+
+r3参考内核是外部Linux6.6.88+及其匹配模块，见[r3源码说明](r3-source.md)。以下Linux6.12.35只作为可选源码构建示例，不代表重现r3参考二进制。
 
 Linux 作为 Git 子模块固定到 `v6.12.35` 对应提交 `783cd2c3dca8b6c434e955b84c20c8940588dc68`。主仓库只保存引用和配置。首次构建先下载：
 
@@ -28,6 +30,8 @@ bash scripts/build-linux-cvm.sh
 入口使用随包保存的 `configs/linux-cvm.config`，在 `build/linux-cvm/` 进行独立输出构建。内核为 `build/linux-cvm/arch/riscv/boot/Image`；Guest 内核模块应针对该次内核的构建目录编译。
 
 获取固定子模块需要网络；初始化完成后可以使用本地工作树构建。项目通过子模块引用上游内核，定制配置保存在主仓库。
+
+Host模块源码位于`runtime/host-driver/`。设置`KERNEL_BUILD_DIR`为目标管理Linux完全匹配的配置/生成头/Module.symvers构建树，再运行`bash scripts/build-host-driver.sh`。输出`tvm-driver.ko`和历史参数兼容`kvm.ko`到build/tools；后者不实现H虚拟化。
 
 ## 3. Asterinas
 
@@ -94,7 +98,7 @@ SDK 安装在 `build/zion/sdk-install/`；runtime 与 loader 在 `build/zion/run
 
 补充的隔离探针与上下文审计源码位于 `src/macrn/tools/sg2044/` 和 `src/macrn/tests/riscv/`；需要执行测试手册的补充检查时，需额外构建并装入 Guest。
 
-`recipes/tee-apps.nix` 固定 Nixpkgs 源及其哈希，用于交叉构建 tee-crypto、tee-vault：
+`recipes/tee-apps.nix`保留旧的独立应用示例，以下可选命令不属于r3参考镜像的准备步骤；r3数据库用户态按[参考initramfs转换](guest-rootfs.md)准备：
 
 ```bash
 mkdir -p build
@@ -112,7 +116,7 @@ initramfs 还需准备 BusyBox、SSH 服务、动态库闭包、SQLite speedtest
 | 输入 | 说明 |
 |---|---|
 | VM0 Image、initramfs、单行启动参数文件 | 与目标 SG2044 管理系统匹配的现有载荷 |
-| Asterinas Image、initramfs、启动参数文件 | 配置 `/init-planb-asterinas` 等实际初始化入口 |
+| Asterinas Image、initramfs、启动参数文件 | 使用r3参考转换器生成的 `/init-planb-asterinas` 入口 |
 | Linux CVM Image、initramfs、启动参数文件 | 含 SSH、virtio 和需要的 Enclave 组件 |
 | 板级 DTB | 使用目标平台的完整有效设备树，含 `/chosen` |
 | `fw_dynamic.bin` | 本次监控器构建输出 |
@@ -122,6 +126,8 @@ initramfs 还需准备 BusyBox、SSH 服务、动态库闭包、SQLite speedtest
 ```bash
 python3 scripts/package-firmware.py --help
 ```
+
+SG2044板级DTB必须使用r3原生rv64imafdcv描述；组装器清除残留扩展列表并保留启动FDT槽，执行254MiB加载边界检查。
 
 为三个域配置提供 `--vm0-*`、`--asterinas-*`、`--linux-*` 参数，并指定 `--board-dtb`、`--firmware`、`--output-dir`。输出为一对 `fw_dynamic.bin` 和 `SG2044.fd`；VM0 常驻，VM1 可切换。
 
@@ -135,6 +141,6 @@ python3 scripts/package-firmware.py --help
 
 安装程序会保留原文件备份；运行时不引入版本回退框架。源码仓库不包含这些备份或任何服务器状态。
 
-部署工具目录还需本地 `guest-test-client.pub` 和 `SHA256SUMS`：公钥由本地 Guest 测试私钥导出，并应与 Guest 内授权公钥匹配；校验清单覆盖四个运行文件及该公钥。不能以重新计算哈希替代工具来源和固件 ABI 的核对。私钥始终放在源码目录之外。首次安装的完整命令见[安装、部署与测试说明](getting-started.md)。
+部署工具目录还需本地 `guest-test-client.pub` 和 `SHA256SUMS`：公钥由本地 Guest 测试私钥导出，并应与 Guest 内授权公钥匹配；校验清单覆盖七个运行文件（四个工具、一个脚本、两个Host模块）及该公钥。不能以重新计算哈希替代工具来源和固件 ABI 的核对。私钥始终放在源码目录之外。首次安装的完整命令见[安装、部署与测试说明](getting-started.md)。
 
 安装路径由 `--prefix`、`--tools-dir`、`--key`、`--entrypoint` 和 `--backup-dir` 指定，默认值见 `configs/deployment.env.example`。安装程序检查端口与真实控制接口，备份已有工具及 SSH 客户端配置，再安装兼容入口；不会修改 SSH 服务端配置。

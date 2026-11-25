@@ -27,6 +27,19 @@ static spinlock_t control_lock;
 static uint32_t state = PLANB_RT_RUNNING, image, requested_image, last_error, clean;
 static uint64_t stops, boot_mstatus, boot_mideleg, boot_menvcfg, boot_scounteren, boot_senvcfg;
 static bool captured;
+/* Test state survives Guest reloads and driver unloads, until Host reboot. */
+static uint32_t tamper_armed, tamper_used, tamper_error;
+
+bool planb_runtime_block_enabled(void)
+{
+ return static_vm_initial_image() != PLANB_IMAGE_ENCLAVE;
+}
+
+void planb_runtime_tamper_detected(void)
+{
+ __atomic_store_n(&tamper_used, 1U, __ATOMIC_RELEASE);
+ __atomic_store_n(&tamper_armed, 0U, __ATOMIC_RELEASE);
+}
 
 bool planb_runtime_range(uint16_t vm, uint64_t address, uint64_t size)
 {
@@ -46,7 +59,18 @@ static int32_t access_control(struct io_request *req, __unused void *context)
  spin_lock_irqsave(&control_lock, &flags);
  s = __atomic_load_n(&state, __ATOMIC_ACQUIRE);
  if (m->direction == ACRN_IOREQ_DIR_WRITE) {
-  if (offset != 8 || m->value < PLANB_RT_STOP || m->value > PLANB_RT_START_LINUX)
+  if (offset == 52) {
+   tamper_error = 0;
+   if (m->value > 1) tamper_error = EINVAL;
+   else if (m->value && __atomic_load_n(&tamper_used, __ATOMIC_ACQUIRE)) tamper_error = EBUSY;
+   else {
+    __atomic_store_n(&tamper_armed, (uint32_t)m->value, __ATOMIC_RELEASE);
+    if (m->value && __atomic_load_n(&tamper_used, __ATOMIC_ACQUIRE)) {
+     __atomic_store_n(&tamper_armed, 0U, __ATOMIC_RELEASE);
+     tamper_error = EBUSY;
+    }
+   }
+  } else if (offset != 8 || m->value < PLANB_RT_STOP || m->value > PLANB_RT_START_ENCLAVE)
    last_error = EINVAL;
   else if (!target) last_error = ENODEV;
   else if (m->value == PLANB_RT_STOP && s == PLANB_RT_STOPPED) last_error = 0;
@@ -74,6 +98,10 @@ static int32_t access_control(struct io_request *req, __unused void *context)
   case 36: m->value = (uint32_t)stops; break;
   case 40: m->value = (uint32_t)static_vms[1].size; break;
   case 44: m->value = static_vms[1].size >> 32; break;
+  case 48: m->value = PLANB_NATIVE_COMPAT_MAGIC; break;
+  case 52: m->value = __atomic_load_n(&tamper_armed, __ATOMIC_ACQUIRE); break;
+  case 56: m->value = tamper_error; break;
+  case 60: m->value = __atomic_load_n(&tamper_used, __ATOMIC_ACQUIRE); break;
   default: m->value = 0; break;
   }
  }

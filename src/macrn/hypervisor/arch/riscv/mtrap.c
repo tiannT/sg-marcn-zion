@@ -17,6 +17,7 @@
 #include <asm/lib/bits.h>
 #include <debug/logmsg.h>
 #include <softirq.h>
+#include <asm/guest/vplic.h>
 #include "uart.h"
 #include "trap.h"
 
@@ -78,6 +79,12 @@ static void mswi_handler(void)
 		clear_bit(SMP_FUNC_CALL, &(per_cpu(swi_vector, cpu).type));
 		kick_notification();
 	}
+#ifdef CONFIG_PLAN_B_SERVICES
+	/* Wake/apply virtual lines on their owner, including a sleeping Guest.
+	 * The management Hart never enters the Guest's vPLIC/event locks.
+	 */
+	vplic_flush_deferred(get_cpu_var(vcpu_run));
+#endif
 }
 
 static void mtimer_handler(void)

@@ -18,6 +18,11 @@ struct acrn_vplic {
 	uint32_t enabled;
 	spinlock_t lock;
 	struct plic_regs regs;
+#ifdef CONFIG_PLAN_B_SERVICES
+	/* Cross-Hart producers publish levels without waiting for this lock. */
+	uint32_t deferred_levels[PLIC_NUM_FIELDS];
+	uint32_t deferred_dirty[PLIC_NUM_FIELDS];
+#endif
 	struct acrn_vm *vm;
 	uint64_t plic_base;
 	uint32_t priority_base;
@@ -42,5 +47,8 @@ enum reset_mode;
 void vplic_init(struct acrn_vm *vm);
 void vplic_accept_intr(struct acrn_vcpu *vcpu, uint32_t vector, bool level);
 void vcpu_inject_extint(struct acrn_vcpu *vcpu);
+#ifdef CONFIG_PLAN_B_SERVICES
+void vplic_flush_deferred(struct acrn_vcpu *vcpu);
+#endif
 
 #endif /* __RISCV_VLAPIC_H__ */

@@ -215,7 +215,7 @@ static void observe_nvme_config(void)
 	uint32_t identity = reg_read(config);
 	uint32_t command, pin, cap, i;
 	char line[220];
-	/* This is the supported WD controller. Do not touch endpoint
+	/* This is the WD controller identified on 179. Do not touch endpoint
 	 * memory before its config identity, BAR and enable state are valid.
 	 */
 	if (identity != 0x504515b7U) {

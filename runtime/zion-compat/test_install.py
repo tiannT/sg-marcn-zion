@@ -33,7 +33,8 @@ class PortableInstallation(unittest.TestCase):
         self.key.chmod(0o600)
         self.originals = {}
         for name in ('planb-guestctl', 'planb-backend', 'macrn-pmp-test',
-                     'planb-runtime.sh', 'guest-test-client.pub', 'SHA256SUMS'):
+                     'planb-runtime.sh', 'tvm-control', 'tvm-driver.ko', 'kvm.ko',
+                     'guest-test-client.pub', 'SHA256SUMS'):
             data = ('fixture for ' + name + '\n').encode()
             (self.tools / name).write_bytes(data)
             self.originals[name] = data
@@ -41,7 +42,7 @@ class PortableInstallation(unittest.TestCase):
         self.client.write_text('Host unrelated.example\n    User deployment\n')
         self.original_client = self.client.read_bytes()
         self.native_status = {'state': 0, 'image': 0, 'error': 0, 'epoch': 0,
-                              'clean': 15, 'stops': 0, 'private_bytes': 4294967296}
+                              'clean': 15, 'stops': 0, 'private_bytes': 4294967296, 'native_compat_abi':1}
 
     def tearDown(self):
         self.temp.cleanup()
@@ -108,6 +109,7 @@ class PortableInstallation(unittest.TestCase):
         with patch.object(module.os, 'geteuid', return_value=0), \
              patch.object(module, 'runtime_status', return_value=self.native_status) as status, \
              patch.object(module.Compat, 'warning_count', return_value=(0, '')), \
+             patch.object(module.Compat, 'native_info', return_value={'used':0,'tamper':0}), \
              contextlib.redirect_stdout(result):
             self.assertEqual(module.main(['status', '--json']), 0)
         self.assertEqual(status.call_args.args[0]['tools'], str(self.tools))

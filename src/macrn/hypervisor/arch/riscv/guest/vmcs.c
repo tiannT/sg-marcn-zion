@@ -351,6 +351,9 @@ void load_vmcs(struct acrn_vcpu *vcpu)
 	load_host_state(vcpu);
 	load_guest_state(vcpu);
 #ifdef CONFIG_MACRN
+	#ifdef CONFIG_PLAN_B_SERVICES
+	vplic_flush_deferred(vcpu);
+	#endif
 	if (!planb_enclave_active(vcpu)) vcpu_inject_extint(vcpu);
 #endif
 	load_guest_pmp(vcpu);

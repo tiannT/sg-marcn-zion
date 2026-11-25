@@ -44,12 +44,14 @@ def main():
             parser.error('Required input does not exist: '+str(path))
     entropy = load('planb_entropy', ROOT/'scripts/provision_test_entropy.py')
     bundle = load('planb_bundle', ROOT/'src/macrn/tools/sg2044/build_runtime_bundle.py')
+    native = load('native_fdt', ROOT/'scripts/native_fdt.py')
     seeded_dtb = entropy.provision(args.board_dtb.read_bytes())
     output.mkdir(parents=True, mode=0o700)
     with tempfile.TemporaryDirectory(prefix='planb-private-') as temporary:
         dtb = Path(temporary)/'board.dtb'
         dtb.write_bytes(seeded_dtb)
         dtb.chmod(0o600)
+        native.sanitize(dtb)
         result = bundle.build_bundle(kernels, initrds, commands, output/'SG2044.fd', dtb)
     shutil.copyfile(args.firmware, output/'fw_dynamic.bin')
     (output/'fw_dynamic.bin').chmod(0o600)

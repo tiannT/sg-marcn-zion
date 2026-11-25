@@ -59,7 +59,11 @@ void start_console(uint32_t cpu)
  * FIXME: currently use the last cpu to handle console timer as
  * the timer seems instable when using BSP to host console.
  */
+#ifdef CONFIG_PLAN_B_SERVICES
+	if (cpu == BSP_CPU_ID) {
+#else
 	if (cpu == (NR_CPUS - 1)) {
+#endif
 		shell_init();
 		console_setup_timer();
 	}

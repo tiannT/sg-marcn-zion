@@ -22,8 +22,9 @@ static void status(void)
  uint32_t s = rd(12), image = rd(16), error = rd(20), clean = rd(32);
  uint64_t epoch = rd(24) | ((uint64_t)rd(28)<<32);
  uint64_t bytes = rd(40) | ((uint64_t)rd(44)<<32);
- printf("{\"state\":%u,\"image\":%u,\"error\":%u,\"epoch\":%llu,\"clean\":%u,\"stops\":%u,\"private_bytes\":%llu}\n",
-  s, image, error, (unsigned long long)epoch, clean, rd(36), (unsigned long long)bytes);
+ printf("{\"state\":%u,\"image\":%u,\"error\":%u,\"epoch\":%llu,\"clean\":%u,\"stops\":%u,\"private_bytes\":%llu,\"native_compat_abi\":%u}\n",
+  s, image, error, (unsigned long long)epoch, clean, rd(36), (unsigned long long)bytes,
+  rd(48)==PLANB_NATIVE_COMPAT_MAGIC ? 1U : 0U);
 }
 static int command(uint32_t cmd, uint32_t expected)
 {
@@ -45,10 +46,11 @@ int main(int argc, char **argv)
  if (argc == 2 && !strcmp(argv[1], "--status")) { }
  else if (argc == 2 && !strcmp(argv[1], "--stop")) { cmd=PLANB_RT_STOP; expected=PLANB_RT_STOPPED; }
  else if (argc == 3 && !strcmp(argv[1], "--start") &&
-  (!strcmp(argv[2], "asterinas") || !strcmp(argv[2], "linux"))) {
-  cmd = !strcmp(argv[2], "asterinas") ? PLANB_RT_START_ASTERINAS : PLANB_RT_START_LINUX;
+  (!strcmp(argv[2], "asterinas") || !strcmp(argv[2], "linux") || !strcmp(argv[2], "enclave"))) {
+  cmd = !strcmp(argv[2], "asterinas") ? PLANB_RT_START_ASTERINAS :
+        !strcmp(argv[2], "enclave") ? PLANB_RT_START_ENCLAVE : PLANB_RT_START_LINUX;
   expected=PLANB_RT_RUNNING;
- } else { fprintf(stderr,"Usage: %s --status | --stop | --start asterinas|linux\n",argv[0]); return 2; }
+ } else { fprintf(stderr,"Usage: %s --status | --stop | --start asterinas|linux|enclave\n",argv[0]); return 2; }
  fd=open("/proc/device-tree/chosen/macrn,planb-runtime-abi",O_RDONLY|O_CLOEXEC);
  if (fd < 0 || read(fd,abi,4)!=4 || memcmp(abi,"\0\0\0\1",4)) {
   fprintf(stderr,"VM0 runtime ABI guard failed; /dev/mem was not opened\n");

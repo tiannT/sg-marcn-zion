@@ -30,6 +30,7 @@
 #define NOT_ACCESSIBLE 100007UL
 #define PROHIBITED 100014UL
 #define NOT_IMPLEMENTED 100100UL
+#define SHARED_RANGE_COUNT 512U
 
 enum state { FREE, CLAIMING, FRESH, RUNNING, STOPPED, EXITED };
 struct region { uint64_t base, size; };
@@ -53,6 +54,13 @@ struct enclave {
 	uint64_t timer;
 };
 static struct enclave slots[SLOT_COUNT];
+/* Native I/O always copies through its bounded bounce channel. Registration
+ * records ownership/lifetime; it never grants VM0 a mapping of VM1 RAM.
+ */
+static struct {
+	struct region memory;
+	uint64_t references;
+} shared_ranges[SHARED_RANGE_COUNT];
 static uint64_t generations[SLOT_COUNT];
 static struct enclave *active_enclave;
 static struct {
@@ -106,6 +114,46 @@ bool planb_enclave_parent_range(uint64_t a, uint64_t n)
 	for (i = 0; i < SLOT_COUNT; i++)
 		if (state_of(&slots[i]) != FREE && overlaps(slots[i].args.epm, a, n)) return false;
 	return true;
+}
+
+static uint64_t shared_memory_call(uint64_t fid, uint64_t base, uint64_t pages)
+{
+	uint64_t size;
+	unsigned int i, available = SHARED_RANGE_COUNT;
+	if (!pages || pages > UINT64_MAX / PAGE_BYTES || (base & (PAGE_BYTES - 1)))
+		return ILLEGAL_ARGUMENT;
+	size = pages * PAGE_BYTES;
+	if (!planb_enclave_parent_range(base, size)) return NOT_ACCESSIBLE;
+	for (i = 0; i < SHARED_RANGE_COUNT; i++) {
+		if (!shared_ranges[i].references) {
+			if (available == SHARED_RANGE_COUNT) available = i;
+			continue;
+		}
+		if (shared_ranges[i].memory.base != base || shared_ranges[i].memory.size != size)
+			continue;
+		if (fid == 1031) {
+			if (!--shared_ranges[i].references)
+				memset(&shared_ranges[i], 0, sizeof(shared_ranges[i]));
+			return 0;
+		}
+		if (shared_ranges[i].references == UINT64_MAX) return ILLEGAL_ARGUMENT;
+		shared_ranges[i].references++;
+		return 0;
+	}
+	if (fid == 1031) return ILLEGAL_ARGUMENT;
+	if (available == SHARED_RANGE_COUNT) return 100003UL;
+	shared_ranges[available].memory = (struct region){base, size};
+	shared_ranges[available].references = 1;
+	return 0;
+}
+
+static bool overlaps_shared_memory(struct region memory)
+{
+	unsigned int i;
+	for (i = 0; i < SHARED_RANGE_COUNT; i++)
+		if (shared_ranges[i].references &&
+		    overlaps(shared_ranges[i].memory, memory.base, memory.size)) return true;
+	return false;
 }
 bool planb_enclave_active(const struct acrn_vcpu *v)
 {
@@ -169,6 +217,7 @@ void planb_enclave_reset_idle(void)
  if (!planb_enclave_idle()) fail_closed("runtime reset with allocated enclave");
  check_extensions();
  memset(slots, 0, sizeof(slots));
+ memset(shared_ranges, 0, sizeof(shared_ranges));
  memset(&parent, 0, sizeof(parent));
  parent.extra.vtype = 1UL << 63; /* architectural reset: vill, vl=0 */
  restore_extended(&parent.extra);
@@ -232,6 +281,7 @@ static bool copy_create(struct run_context *ctx, uint64_t va, struct create_args
 static bool valid_args(const struct create_args *a)
 {
 	return a->epm.size >= 2 * PAGE_BYTES && a->epm.size <= MAX_EPM &&
+		!overlaps_shared_memory(a->epm) &&
 		!(a->epm.size & (a->epm.size - 1)) && !(a->epm.base & (a->epm.size - 1)) &&
 		owned(a->epm.base, a->epm.size) && a->utm.size && a->utm.size <= MAX_UTM &&
 		!((a->utm.base | a->utm.size | a->runtime | a->user | a->free |
@@ -430,6 +480,12 @@ bool planb_enclave_sbi(struct acrn_vcpu *v)
 		r->a0 = PROHIBITED; r->a1 = 0; return true;
 	}
 	cpu_disable_mirq();
+	if (fid == 1030 || fid == 1031) {
+		r->a0 = shared_memory_call(fid, argument, r->a1);
+		r->a1 = 0;
+		cpu_enable_mirq();
+		return true;
+	}
 	if (fid == 2001) error = create(ctx, argument, &value);
 	else {
 		e = lookup(argument);

@@ -259,6 +259,21 @@ static void respond(struct planb_slot *shared, const struct planb_slot *request,
         shared->saved_s2_s10[1] = 0x5a494f4eU;
         tampered = true;
         printf("PLANB_INJECTED_S3 sequence=%llu value=0x5a494f4e\n", (unsigned long long)request->sequence);
+        {
+            int event_log = open("/dev/kmsg", O_WRONLY | O_CLOEXEC);
+            if (event_log >= 0) {
+                char message[160];
+                int message_length = snprintf(message, sizeof(message),
+                    "<6>[ZION VCPU TAMPER] register=S3 value=0x5a494f4e sequence=%llu\n",
+                    (unsigned long long)request->sequence);
+                /* /dev/kmsg accepts one complete write. stdio may try an
+                 * unsupported seek and drop the event before writing it. */
+                if (message_length <= 0 || (size_t)message_length >= sizeof(message) ||
+                    write(event_log, message, (size_t)message_length) != message_length)
+                    fprintf(stderr, "PLANB_KERNEL_EVENT_LOG_FAILED errno=%d\n", errno);
+                close(event_log);
+            } else fprintf(stderr, "PLANB_KERNEL_EVENT_LOG_OPEN_FAILED errno=%d\n", errno);
+        }
     }
     /* /dev/mem O_SYNC may map this shared RAM with an I/O memory type.
      * RISC-V AMOs are not supported by every such mapping (SG2044 faults).
@@ -283,6 +298,7 @@ static void service(struct planb_slot *shared, unsigned int slot, int disk, int 
     __sync_synchronize();
     shared_read(&request, shared, sizeof(request));
     if (slot == 0) {
+        if (disk < 0) { respond(shared, &request, ENODEV, 0); return; }
         if (request.operation == PLANB_BLK_WRITE && request.length <= sizeof(buffer))
             shared_read(buffer, data, request.length);
         result = disk_transfer(disk, &request, buffer);
@@ -328,7 +344,7 @@ int main(int argc, char **argv)
     uint64_t addresses[3] = {PLANB_SLOT_BLK, PLANB_SLOT_TX, PLANB_SLOT_RX};
     uint8_t *shared;
     int memory, disk, network, i;
-    bool status_only = false, create_disk = false;
+    bool status_only = false, console_only = false, console_info = false, create_disk = false, no_block = false;
     setvbuf(stdout, NULL, _IOLBF, 0);
     for (i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--disk") && i + 1 < argc) backing = argv[++i];
@@ -337,43 +353,92 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--tap-address") && i + 1 < argc) tap_address = argv[++i];
         else if (!strcmp(argv[i], "--tamper-s3-once")) tamper_once = true;
         else if (!strcmp(argv[i], "--create-disk")) create_disk = true;
+        else if (!strcmp(argv[i], "--no-block")) no_block = true;
         else if (!strcmp(argv[i], "--status")) status_only = true;
+        else if (!strcmp(argv[i], "--console")) console_only = true;
+        else if (!strcmp(argv[i], "--console-info")) console_info = true;
         else {
             fprintf(stderr, "Usage: %s --disk FILE (--tap NEWNAME [--tap-address 10.0.3.1|10.0.2.2] | --network-connect IPv4:PORT) [--tamper-s3-once]\n       %s --status\n", argv[0], argv[0]);
             return 2;
         }
     }
-    if (!status_only && (!backing || (!!endpoint == !!tap_name))) return 2;
+    if (!status_only && !console_only && !console_info &&
+        ((!no_block && !backing) || (no_block && (backing || create_disk || tamper_once)) || (!!endpoint == !!tap_name))) return 2;
     if (strcmp(tap_address, "10.0.3.1") && strcmp(tap_address, "10.0.2.2")) return 2;
     if (!firmware_guard()) return 2;
-    memory = open("/dev/mem", O_RDWR | O_SYNC | O_CLOEXEC);
+    memory = open("/dev/mem", ((status_only || console_only || console_info) ? O_RDONLY : O_RDWR) | O_SYNC | O_CLOEXEC);
     if (memory < 0) die("open /dev/mem");
-    control = mmap(NULL, 4096, PROT_READ | PROT_WRITE, MAP_SHARED, memory, PLANB_CTL_MMIO);
+    control = mmap(NULL, 4096, PROT_READ | ((status_only || console_only || console_info) ? 0 : PROT_WRITE), MAP_SHARED, memory, PLANB_CTL_MMIO);
     if (control == MAP_FAILED) die("map checked control device");
     if (((uint64_t)control[1] << 32 | control[0]) != PLANB_MAGIC || control[3] != PLANB_ABI) {
         fprintf(stderr, "Control device ABI does not match.\n"); return 2;
+    }
+    if (console_only || console_info) {
+        unsigned int attempt;
+        uint32_t generation, length, dropped, capacity, j;
+        volatile uint32_t *console;
+        uint8_t *snapshot;
+        if (control[8] != PLANB_FEATURE_MAGIC || !(control[9] & PLANB_FEATURE_CONSOLE)) {
+            fputs("Matching 2044 console firmware is required; no stored transcript was fabricated.\n", stderr);
+            return 2;
+        }
+        capacity = control[14];
+        if (capacity != PLANB_CONSOLE_BYTES) { fputs("Console capacity mismatch\n", stderr); return 2; }
+        if (console_info) {
+            printf("{\"bytes\":%u,\"dropped\":%u,\"generation\":%u,\"capacity\":%u,\"busy_doorbells\":%u}\n",
+                control[10], control[11], control[12], capacity, control[13]);
+            return 0;
+        }
+        console = mmap(NULL, capacity, PROT_READ, MAP_SHARED, memory, PLANB_CONSOLE_MMIO);
+        snapshot = malloc(capacity);
+        if (console == MAP_FAILED || !snapshot) die("console snapshot allocation");
+        for (attempt = 0; attempt < 3; attempt++) {
+            generation = control[12];
+            length = control[10];
+            dropped = control[11];
+            if (length > capacity) { fputs("Console length mismatch\n", stderr); return 2; }
+            /* Only scalar MMIO reads; fwrite receives ordinary RAM. */
+            for (j = 0; j < length; j += 4U) {
+                uint32_t word = console[j / 4U], k;
+                for (k = 0; k < 4U && j + k < length; k++) snapshot[j + k] = (uint8_t)(word >> (8U * k));
+            }
+            if (generation == control[12]) {
+                if (fwrite(snapshot, 1, length, stdout) != length) die("write console snapshot");
+                free(snapshot); munmap((void *)console, capacity); munmap((void *)control, 4096); close(memory);
+                if (dropped) { fputs("Guest console transcript was truncated\n", stderr); return 1; }
+                return 0;
+            }
+        }
+        fputs("Guest reloaded during console snapshot; retry status\n", stderr);
+        return 2;
     }
     if (status_only) {
         printf("PLANB_STATUS warnings=%u completed=%u\n", control[6], control[7]);
         munmap((void *)control, 4096); close(memory); return 0;
     }
+    if (control[8] != PLANB_FEATURE_MAGIC || !(control[9] & PLANB_FEATURE_NONBLOCK_IO)) {
+        fputs("Install the matching 2044 nonblocking-I/O firmware before starting this backend.\n", stderr); return 2;
+    }
     shared = mmap(NULL, SHARED_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, memory, SHARED_BASE);
     if (shared == MAP_FAILED) die("map explicit shared I/O window");
     for (i = 0; i < 3; i++) slots[i] = (struct planb_slot *)(shared + addresses[i] - SHARED_BASE);
-    disk = open_disk(backing, create_disk);
+    disk = no_block ? -1 : open_disk(backing, create_disk);
     network = tap_name ? open_tap(tap_name, tap_address) : open_tcp(endpoint);
     signal(SIGINT, stop_backend);
     signal(SIGTERM, stop_backend);
     signal(SIGPIPE, SIG_IGN);
     printf("PLANB_BACKEND_READY abi=%u network=%s disk_bytes=%llu\n", PLANB_ABI,
-        tap_name ? tap_name : endpoint, (unsigned long long)PLANB_DISK_BYTES);
+        tap_name ? tap_name : endpoint, no_block ? 0ULL : (unsigned long long)PLANB_DISK_BYTES);
     while (running) {
         for (i = 0; i < 3; i++) service(slots[i], (unsigned int)i, disk, network, tap_name != NULL);
+        /* Retry responses deferred by the monitor while VM1 held its queue lock. */
+        control[2] = 1U;
+        __sync_synchronize();
         usleep(1000);
     }
     printf("PLANB_BACKEND_STOP reads=%lu writes=%lu tx=%lu rx=%lu warnings=%u completed=%u\n",
         block_reads, block_writes, network_tx, network_rx, control[6], control[7]);
-    close(network); close(disk);
+    close(network); if (disk >= 0) close(disk);
     munmap(shared, SHARED_SIZE); munmap((void *)control, 4096); close(memory);
     return 0;
 }

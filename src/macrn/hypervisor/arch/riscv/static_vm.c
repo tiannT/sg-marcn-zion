@@ -349,11 +349,19 @@ static const void *bundle_item(const struct bundle_header *h, uint64_t offset, u
 #endif
      || !inside(0, h->total_size, offset, size))
 		reject("invalid payload offset/length");
+	/* ZSBL owns this boot-time FDT slot even in an expanded bundle. */
+	if (h->total_size > STATIC_BOOT_FDT_BASE - STATIC_BUNDLE_BASE &&
+	    offset < STATIC_BOOT_FDT_BASE + STATIC_BOOT_FDT_SIZE - STATIC_BUNDLE_BASE &&
+	    offset + size > STATIC_BOOT_FDT_BASE - STATIC_BUNDLE_BASE)
+		reject("payload overlaps boot device tree");
 	return (const char *)h + offset;
 }
 #ifdef CONFIG_PLAN_B_RUNTIME
 static const struct bundle_vm *image_descriptor(const struct bundle_header *h, unsigned int n)
 {
+ /* Linux and enclave mode share the exact reference kernel/initramfs;
+  * enclave mode has a separate runtime identity and no block device. */
+ if (n == PLANB_IMAGE_ENCLAVE) n = PLANB_IMAGE_LINUX;
  return &((const struct bundle_vm *)((const char *)h + 40))[n];
 }
 static void validate_image(const struct bundle_header *h, unsigned int n)
@@ -389,7 +397,7 @@ void static_vm_reload_guest(uint32_t image)
 {
  const struct bundle_vm *d;
  struct static_vm_info *info = &static_vms[1];
- if (image < PLANB_IMAGE_ASTERINAS || image > PLANB_IMAGE_LINUX || guest_epoch == UINT64_MAX)
+ if (image < PLANB_IMAGE_ASTERINAS || image > PLANB_IMAGE_ENCLAVE || guest_epoch == UINT64_MAX)
   reject("invalid unified Guest reload");
  d = image_descriptor(retained_bundle, image);
  active_image = image;

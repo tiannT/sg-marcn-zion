@@ -75,7 +75,8 @@ def main():
     tools = args.tools_dir
     key = args.key
     public_files = ['planb-guestctl', 'planb-backend', 'macrn-pmp-test',
-                    'planb-runtime.sh', 'guest-test-client.pub', 'SHA256SUMS']
+                    'planb-runtime.sh', 'tvm-control', 'tvm-driver.ko', 'kvm.ko',
+                    'guest-test-client.pub', 'SHA256SUMS']
     for name in public_files:
         if not (tools/name).is_file():
             raise RuntimeError('Missing runtime input: '+str(tools/name))
@@ -83,7 +84,9 @@ def main():
         raise RuntimeError('Keep the private Guest identity outside the public tools directory')
     if key.stat().st_uid != 0 or key.stat().st_mode & 0o777 != 0o600 or key.is_symlink():
         raise RuntimeError('Existing local Guest identity must be root-owned mode 0600')
-    subprocess.run([str(tools / 'planb-guestctl'), '--status'], check=True)
+    probe = subprocess.run([str(tools / 'planb-guestctl'), '--status'], check=True, capture_output=True, text=True)
+    if json.loads(probe.stdout).get('native_compat_abi') != 1:
+        raise RuntimeError('Install matching SG2044 native ABI1 firmware before these tools')
     deployment = args.tag + '-' + time.strftime('%Y%m%dT%H%M%SZ', time.gmtime()) + '-' + str(os.getpid())
     backup = args.backup_dir / ('zion-cli-' + deployment)
     backup.mkdir(parents=True, mode=0o700)
@@ -118,7 +121,7 @@ def main():
     shutil.copy2(pkg / 'zion-runtime.sh', root / 'zion-runtime.sh')
     (root / 'zion-runtime.sh').chmod(0o700)
     config = dict(deployment_id=deployment, tools=str(tools), key=str(key),
-                  pmp_fixture='0x400080000', backup=str(backup), backend='macrn-planb')
+                  pmp_fixture='0x400080000', backup=str(backup), backend='2044', platform='2044', native_compat_abi=1)
     (root / 'config.json').write_text(json.dumps(config, indent=2) + '\n')
     (root / 'config.json').chmod(0o600)
     (root / 'state/localhost.known').touch(mode=0o600)
