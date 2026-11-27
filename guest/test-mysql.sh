@@ -26,8 +26,7 @@ trap cleanup EXIT
 /usr/sbin/mysqld --defaults-file=/etc/zion-mysql.cnf > /tmp/zion-db/mysql/stdout.log 2>&1 &
 owned_pid=$!
 sleep 5
-# Five seconds is the original initial wait, not a benchmark deadline.
-# Wait for actual readiness before issuing the unchanged benchmark.
+# Wait for server readiness before starting the benchmark.
 ready=0
 attempt=0
 while test "$attempt" -lt 60; do
@@ -51,7 +50,7 @@ fi
 CREATE USER IF NOT EXISTS 'zion'@'127.0.0.1' IDENTIFIED BY 'zion-test-only';
 GRANT ALL ON zion_slap.* TO 'zion'@'127.0.0.1';
 SQL
-(set +e; MYSQL_PWD=zion-test-only /usr/bin/mysqlslap --no-defaults --protocol=TCP --host=127.0.0.1 --port=3306 --user=zion --create-schema=zion_slap --auto-generate-sql --auto-generate-sql-load-type=mixed --concurrency=2 --iterations=2 --number-of-queries=200; rc=$?; printf '%s\n' "$rc" > /tmp/zion-db/mysql/mysqlslap.rc) 2>&1 | tee mysql-benchmark.log
+(set +e; MYSQL_PWD=zion-test-only /usr/bin/mysqlslap --no-defaults --protocol=TCP --host=127.0.0.1 --port=3306 --user=zion --create-schema=zion_slap --auto-generate-sql --auto-generate-sql-load-type=mixed --concurrency=10 --iterations=5 --number-of-queries=1000; rc=$?; printf '%s\n' "$rc" > /tmp/zion-db/mysql/mysqlslap.rc) 2>&1 | tee mysql-benchmark.log
 test "$(cat /tmp/zion-db/mysql/mysqlslap.rc)" -eq 0
 /usr/bin/mysql --no-defaults --socket=/tmp/zion-db/mysql/mysql.sock -uroot -N -e 'SELECT VERSION(), @@innodb_buffer_pool_size, @@innodb_use_native_aio;'
 /usr/bin/mysqladmin --no-defaults --socket=/tmp/zion-db/mysql/mysql.sock -uroot shutdown

@@ -1,13 +1,13 @@
 {
   "format": 2,
-  "description": "R3 runtime source, deployment/testing instructions and fixed Linux 6.6.88 source reference; no build workflows",
-  "file_count": 481,
-  "total_bytes": 2757835,
+  "description": "SG2044 TEE runtime sources, prebuilt Asterinas kernel and deployment/testing documentation",
+  "file_count": 486,
+  "total_bytes": 6510702,
   "files": [
     {
       "path": ".gitignore",
-      "bytes": 105,
-      "sha256": "8ba97f8f16d4b5ed726c4f7944627f909696eb4b12a2e1a9119e31b4b47f5de9"
+      "bytes": 146,
+      "sha256": "b8ed1797d7aec315cfd6ce3dda2aafc24fcb21a361b562120193f32a5af3a0b9"
     },
     {
       "path": ".gitmodules",
@@ -15,44 +15,39 @@
       "sha256": "a5cd6a49e44bc605e1bb278b88b47492a150d3071c64c76cf5b412f65a42e009"
     },
     {
-      "path": "R3_VERSION.json",
-      "bytes": 693,
-      "sha256": "eb6093a32721c8ef93e920fa38244f56769430ca9ce7e4434082b5dafbfe627c"
-    },
-    {
       "path": "README.md",
-      "bytes": 1799,
-      "sha256": "afadd2d78cd1f9486a8ab11fef6ad6697f5786e04679735fa54b0096a5666fa1"
+      "bytes": 2131,
+      "sha256": "9cb4a0a387fd1a2833b9fe2235817e899ce75d0321fdafb91ae069fafa71c65f"
     },
     {
       "path": "THIRD_PARTY.md",
-      "bytes": 819,
-      "sha256": "5adac3dbc2062f350f0ac76b4ee17b9ab6d63e7fa9cc0127ef1d59b609209596"
+      "bytes": 960,
+      "sha256": "97d3774132214a338474acfb9029af8e6fe21100177308adf1548466726ab0ea"
     },
     {
       "path": "docs/deployment.md",
-      "bytes": 2233,
-      "sha256": "d3e389c0d614994b7a0adc79455653e0ee1f26d61e9a1aa9f03a7b558cb406c7"
+      "bytes": 2601,
+      "sha256": "e6437bab38a6ba9fa78c9c3bb9a98d817d699057bbbc266aab4a3fe137a0cde5"
     },
     {
       "path": "docs/testing.md",
-      "bytes": 6487,
-      "sha256": "da83596e142c833148da1a71cc9da2ed487bab3bbd2e4c2d58e8a615b8734332"
+      "bytes": 6309,
+      "sha256": "8d600ce7f93bd36e40aa309a223b9d3c0b65e5419e7d90f22c94d0a818c4148b"
     },
     {
       "path": "guest/test-mysql.sh",
-      "bytes": 2322,
-      "sha256": "c6388864536c1f9f71f0d1bd7ddb0f6ab19bebafd3d15c387d25ca1006b8129c"
+      "bytes": 2244,
+      "sha256": "194e751eaf1f4850ecd23df426c47e4558b65c6b576e5221657021e3da4e5166"
     },
     {
       "path": "guest/test-redis.sh",
-      "bytes": 1334,
-      "sha256": "09dc3e257106224c9ca6d742190f86b884859c70c753b7fd2597fac283731017"
+      "bytes": 1320,
+      "sha256": "dc35f243f2d5ec825010eaa1bfa036932b6966d02070ce0de7198823adfb883b"
     },
     {
       "path": "host/compat/common.py",
-      "bytes": 2513,
-      "sha256": "4cd98dfd6f1602eb421511b28bc2be13280462ee17da9e546ac6b5f8da23bdaa"
+      "bytes": 2496,
+      "sha256": "f613336da48774fb2cb35c5b6f1e32fa54a95da85bc517adb5c475f321e6763e"
     },
     {
       "path": "host/compat/portproxy.py",
@@ -61,13 +56,13 @@
     },
     {
       "path": "host/compat/zion_runtime.py",
-      "bytes": 15192,
-      "sha256": "c8a49ec2be9bbdf0bb2a5ce1a7c496ef6d78b10b76fcd8f059cc499d8a2a5b3b"
+      "bytes": 16272,
+      "sha256": "c6dea2c50816a4b1d01e28e3e19a680d7fa17921227dab3c36360f13d4b5a8bf"
     },
     {
       "path": "host/install-host.py",
-      "bytes": 7742,
-      "sha256": "83027b4a7308a0a96512bcebb6e40be0c563ec48c3a5db1144c32c67848d4a41"
+      "bytes": 7739,
+      "sha256": "5a13636f89660d295521a7923cfa44e90d366f145c04e364fd0871764db74e27"
     },
     {
       "path": "host/zion-runtime.sh",
@@ -76,8 +71,8 @@
     },
     {
       "path": "kernel-reference.json",
-      "bytes": 554,
-      "sha256": "ebdce0468d31de3996ec8e34309c8aa42780ddcb5ce0a0675a49ca136155c772"
+      "bytes": 523,
+      "sha256": "fc7d717f1cf4daa60b621b1e779041f188c959159cda14bd2f14c0ddf2257fa6"
     },
     {
       "path": "linux/planb-runtime.sh",
@@ -85,9 +80,39 @@
       "sha256": "0aee72af7b1b6f9a08af473d7b2e752535fbf2085e5f1ca4686ab90a67b75ee5"
     },
     {
+      "path": "prebuilt/asterinas/LICENSE-MPL",
+      "bytes": 16725,
+      "sha256": "86cf9656479f1edb82245b985f4a2cc0d503b945766ebeda4269c60b307699ae"
+    },
+    {
+      "path": "prebuilt/asterinas/README.md",
+      "bytes": 1110,
+      "sha256": "63c42f37b2e1e2b53a616716a245bbffbe88b7c020062163d49e5a446d8db81d"
+    },
+    {
+      "path": "prebuilt/asterinas/SHA256SUMS",
+      "bytes": 87,
+      "sha256": "beace07c944af0840b73bf100e4b0dfc1c1b98c285792e85e2e558c663bd3fef"
+    },
+    {
+      "path": "prebuilt/asterinas/asterinas_kernel.bin",
+      "bytes": 3732764,
+      "sha256": "ad7225112f5f1852dc3f05ed1276eb08e3490630aa62bcf4199bf30ff53db20a"
+    },
+    {
+      "path": "prebuilt/asterinas/manifest.json",
+      "bytes": 911,
+      "sha256": "9214dd23d73dbc3ceeb086f1ec3a53c5618e5bf43d88d7c9f0cd752ce08bc759"
+    },
+    {
       "path": "run-case.sh",
-      "bytes": 3314,
-      "sha256": "0c0a802b5fb1e9c6bbdb14edbe82d45797a854024d87597c877ead28e5645145"
+      "bytes": 3311,
+      "sha256": "74b09a1927c4cb21fab43a19886bc4c5313ea79636777d1ba1eeb4c396813e27"
+    },
+    {
+      "path": "runtime-reference.json",
+      "bytes": 325,
+      "sha256": "0fdda2e1d4c80d57a42ee96191772ab8b544eb1c795a1b1facf8d85facba8ae3"
     },
     {
       "path": "source/host-driver/kvm.c",
@@ -2406,7 +2431,7 @@
     {
       "path": "tools/reference-kernel.py",
       "bytes": 1625,
-      "sha256": "ba9f234c4e71a6b77ac75c4c91825e9db690b1918723f34fd3e23b234cd96ea0"
+      "sha256": "fa3238dda86c647d687964e4ef7a190a932983ee14cec1a58b78e51e56dc4020"
     }
   ]
 }

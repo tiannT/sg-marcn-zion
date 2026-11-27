@@ -1,48 +1,49 @@
-# R3部署与运行
+# 部署与运行
 
-以现有R3交付包及其配套身份为输入。已部署的Host可直接运行原Zion命令，无需重复安装。更换固件和Host重启由操作人员安排。
+## 环境准备
 
-## 核对参考内核
+- SG2044管理Linux已由配套启动镜像启动，安全监控器提供原生ABI 1。
+- Host工具和驱动与启动镜像匹配。
+- Guest已配置SSH公钥，Host持有对应私钥。
 
-使用天权星现成guest_kernel_image：
+已有`/root/zion-tests`入口的环境可直接[启动Guest](#启动guest)。首次安装需要准备以下文件：
 
-```bash
-python3 tools/reference-kernel.py --kernel /path/to/guest_kernel_image
+```text
+planb-guestctl
+planb-backend
+macrn-pmp-test
+planb-runtime.sh
+tvm-control
+tvm-driver.ko
+kvm.ko
+guest-test-client.pub
 ```
 
-如只有R3交付包，可从riscv64/SG2044.fd提取并核对原内核：
+Host上的`kvm.ko`提供控制参数接口，Guest运行由安全监控器管理。
+
+## 首次安装Host工具
+
+将工具和公钥放入同一目录，生成校验清单：
 
 ```bash
-python3 tools/reference-kernel.py --payload /path/to/R3/riscv64/SG2044.fd --output /tmp/guest_kernel_image
-```
-
-两种输入都必须匹配kernel-reference.json中的28683264字节及SHA256。提取仅复制已有字节，不编译或重新组装镜像。Guest模块与initramfs沿用该内核的R3配套文件。
-
-## Host文件
-
-使用R3交付包linux目录的planb-guestctl、planb-backend、macrn-pmp-test、planb-runtime.sh、tvm-control、tvm-driver.ko和kvm.ko。保留交付包对应的guest-test-client.pub，以及与Guest授权匹配的Host本机私钥；不要为现有镜像随意替换身份。
-
-首次安装时，将上述文件与公钥放在同一工具目录，并记录其校验清单：
-
-```bash
-cd /path/to/r3-tools
+cd /path/to/host-tools
 sha256sum planb-guestctl planb-backend macrn-pmp-test planb-runtime.sh \
   tvm-control tvm-driver.ko kvm.ko guest-test-client.pub > SHA256SUMS
 ```
 
-在目标Host的root Bash执行本仓库host/install-host.py，明确指定工具和既有身份：
+在本仓库根目录，以root执行：
 
 ```bash
-python3 host/install-host.py --tools-dir /path/to/r3-tools \
-  --key /path/to/existing-guest-key --prefix /opt/sg2044-r3 \
+python3 host/install-host.py --tools-dir /path/to/host-tools \
+  --key /path/to/guest_ed25519 --prefix /opt/sg2044 \
   --entrypoint /root/zion-tests
 ```
 
-安装器仅接受原生ABI1；已有入口拒绝覆盖。init会核对工具、实际/dev/tvm和历史参数接口，不能使用不匹配的Host模块。此处没有旧仓库版本升级或兼容步骤。
+私钥应由root持有、权限为0600，并与Guest中的授权公钥匹配。安装程序会检查ABI和输入文件、保存SSH配置备份；已有安装入口会拒绝覆盖。
 
-## 运行
+## 启动Guest
 
-在管理Host执行：
+在管理Host上执行：
 
 ```bash
 cd /root/zion-tests
@@ -53,4 +54,34 @@ sh ./zion-runtime.sh guest
 ssh -p 10022 root@127.0.0.1
 ```
 
-普通Linux使用./zion-runtime.sh linux，独立Enclave使用./zion-runtime.sh enclave；受控停止使用./zion-runtime.sh stop。独立Enclave模式无virtio-blk。镜像切换会清理Guest RAM，先保存需要的测试输出。
+`init`初始化驱动、校验工具并建立访问入口。状态中的`native_compat_abi`应为1，`error`应为0。
+
+```bash
+./zion-runtime.sh linux
+./zion-runtime.sh enclave
+./zion-runtime.sh stop
+```
+
+上述命令分别启动Linux CVM、启动独立Enclave环境和停止Guest。切换会清理Guest私有内存；独立Enclave环境不提供virtio块设备。
+
+## Asterinas内核
+
+仓库提供[预编译内核](../prebuilt/asterinas/README.md)，可直接作为统一载荷的内核输入。配套initrd、SHA256和来源提交见[内核清单](../prebuilt/asterinas/manifest.json)。
+
+完整SD镜像包含启动载荷和前级启动文件。更换单个内核时，需先更新`SG2044.fd`，再重新上电加载。
+
+## Linux CVM内核
+
+使用现成的Linux 6.6.88+内核及配套模块、initramfs，核对文件：
+
+```bash
+python3 tools/reference-kernel.py --kernel /path/to/guest_kernel_image
+```
+
+从统一载荷中提取并核对：
+
+```bash
+python3 tools/reference-kernel.py --payload /path/to/riscv64/SG2044.fd --output /tmp/guest_kernel_image
+```
+
+内核应为28683264字节，并匹配[kernel-reference.json](../kernel-reference.json)中的SHA256。

@@ -14,10 +14,10 @@ from common import atomic, boot_id, load, process_start, proxy_live, refresh_kno
 ROOT = Path(__file__).resolve().parents[1]
 TAMPER_PARAMETER = Path('/sys/module/kvm/parameters/zion_vcpu_tamper')
 HELP = '''Usage: ./zion-runtime.sh select [linux|asterinas]|init|protect|guest|linux|enclave|asterinas|status|stop
-       ./zion-runtime.sh tamper-s3 [0|1|status]
+       ./zion-runtime.sh tamper-s3 [0|1|status|preflight]
 Backend: SG2044 native ABI1. Run commands locally on the management Host.
 SSH: ssh -p 10022 root@127.0.0.1 (existing local test identity configured).
-enclave starts the reference Linux in a separate mode without virtio-blk.
+enclave starts Linux in a separate mode without virtio-blk.
 0007 uses the real /dev/tvm driver; 0008 accepts the original KVM parameter path.
 '''
 
@@ -160,7 +160,7 @@ class Compat:
         r = subprocess.run(['sha256sum', '-c', 'SHA256SUMS'], cwd=self.tools, capture_output=True, text=True)
         print(r.stdout, end='')
         if r.returncode:
-            raise RuntimeError('Underlying P4R3 tool hashes do not match')
+            raise RuntimeError('Host tool checksums do not match')
         runtime_status(self.config)
         if not Path('/dev/tvm').exists():
             self.tool(['insmod',self.tools/'tvm-driver.ko'])
@@ -221,17 +221,39 @@ class Compat:
         save(self.state / 'cvm-console.json', dict(host_boot_id=boot_id(), epoch=value['epoch'],
              image=value['image'], bytes=len(transcript.stdout),
              sha256=hashlib.sha256(transcript.stdout).hexdigest(), source='actual VM1 SBI and UART bytes'))
-        # Same public status behavior as Tianquan: tail -n 60 state/cvm.log.
-        subprocess.run(['tail', '-n', '60', str(log)], check=True)
+        # Preserve the complete Guest console in arrival order.
+        sys.stdout.flush()
+        sys.stdout.buffer.write(transcript.stdout)
+        sys.stdout.buffer.flush()
+
+    def require_tamper_window(self, value):
+        if value['phase'] == 'consumed':
+            raise RuntimeError(
+                'S3 one-shot test already consumed in this Host boot (used=1). '
+                'Restart the Host before a new test; restarting the Guest or '
+                'reloading the driver cannot reset this window. No injection was written.')
+        if value['phase'] == 'armed':
+            raise RuntimeError(
+                'S3 injection is already armed. Run linux to consume it, or '
+                'tamper-s3 0 to cancel it before starting a new test.')
+        if self.warning_count()[0] != 0:
+            raise RuntimeError(
+                'The monitor has already reported an S3 warning in this Host boot. '
+                'Restart the Host before a new one-shot test. No injection was written.')
 
     def tamper(self, argument):
         value = self.tamper_state()
-        if argument == '1':
+        if argument in ('1', 'preflight'):
+            self.require_tamper_window(value)
+        if argument == 'preflight':
+            print('S3_TEST_READY: used=0 parameter=0 warnings=0')
+            return
+        elif argument == '1':
             TAMPER_PARAMETER.write_text('1\n')
         elif argument == '0':
             TAMPER_PARAMETER.write_text('0\n')
         elif argument != 'status':
-            raise RuntimeError('Usage: ./zion-runtime.sh tamper-s3 [0|1|status]')
+            raise RuntimeError('Usage: ./zion-runtime.sh tamper-s3 [0|1|status|preflight]')
         value=self.tamper_state()
         print('zion_vcpu_tamper=' + str(value['parameter']))
         print(json.dumps(value, ensure_ascii=False))

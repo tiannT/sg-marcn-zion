@@ -6,6 +6,6 @@
   "source_repository": "https://github.com/sdww0/rockos-kernel.git",
   "source_branch": "zion-guest",
   "source_commit": "ba3a4296ab14d57143c8398cfe493696b61207c5",
-  "runtime_policy": "Reuse the existing Tianquan kernel and matching Guest userland/modules from the R3 delivery; no kernel rebuild",
+  "runtime_policy": "Use the supplied Linux 6.6.88+ Image with matching Guest modules and initramfs.",
   "reference_image_source_commit_independently_proven": false
 }

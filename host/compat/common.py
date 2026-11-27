@@ -1,4 +1,4 @@
-"""Root-owned compatibility state; no firmware or Guest memory emulation."""
+"""Root-owned runtime state and SSH connection metadata."""
 import json
 import os
 from pathlib import Path

@@ -1,0 +1,13 @@
+{
+  "platform": "SG2044",
+  "native_compat_abi": 1,
+  "guest_profiles": [
+    "asterinas",
+    "linux",
+    "enclave"
+  ],
+  "asterinas_kernel_manifest": "prebuilt/asterinas/manifest.json",
+  "linux_kernel_manifest": "kernel-reference.json",
+  "host_driver_source": "source/host-driver",
+  "monitor_source": "source/macrn"
+}

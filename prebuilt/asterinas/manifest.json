@@ -1,0 +1,31 @@
+{
+  "file": "asterinas_kernel.bin",
+  "format": "Uncompressed RISC-V Image",
+  "bytes": 3732764,
+  "sha256": "ad7225112f5f1852dc3f05ed1276eb08e3490630aa62bcf4199bf30ff53db20a",
+  "source_repository": "https://github.com/sdww0/asterinas",
+  "source_commit": "fc16273b04ec3df80bc425ede2e3e8f768a29d13",
+  "source_tree": "6e1f871655fef3e84381b7af62eccd1bb566e2b4",
+  "image_header": {
+    "text_offset": "0x200000",
+    "memory_size": 3753976
+  },
+  "platform": "SG2044",
+  "native_compat_abi": 1,
+  "matching_initrd": {
+    "file": "asterinas_initrd.cpio.gz",
+    "format": "gzip-compressed newc CPIO",
+    "bytes": 66794516,
+    "sha256": "c2aff78811a68b9ce1bac0b043d8e0c211921c5760633476636f86830e84ac57"
+  },
+  "validation": {
+    "native_hardware": true,
+    "asterinas_boot_and_ssh": "passed",
+    "sqlite": "passed",
+    "redis": "passed",
+    "mysql": "passed"
+  },
+  "licenses": [
+    "LICENSE-MPL"
+  ]
+}

@@ -11,3 +11,4 @@
 *.fd
 *.bin
 guest_kernel_image
+!prebuilt/asterinas/asterinas_kernel.bin

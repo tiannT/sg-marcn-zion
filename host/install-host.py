@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Back up original files, then install the Host-only command adapter."""
+"""Install Host management commands and configure Guest SSH access."""
 import argparse
 import hashlib
 import json

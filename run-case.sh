@@ -1,5 +1,5 @@
 #!/bin/bash
-# Invoke existing Zion CLI and original Guest programs on SG2044 VM0.
+# Run Guest tests from the SG2044 management Host.
 set -euo pipefail
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 base=${ZION_ENTRYPOINT:-/root/zion-tests}
@@ -38,7 +38,7 @@ case "$case_id" in
   ;;
  0002)
   start_asterinas
-  guest '/benchmark/bin/sqlite-speedtest1 --size 10; rc=$?; printf "sqlite_exit=%s\n" "$rc"; exit "$rc"'
+  guest '/benchmark/bin/sqlite-speedtest1; rc=$?; printf "sqlite_exit=%s\n" "$rc"; exit "$rc"'
   ;;
  0003|0004)
   start_asterinas
@@ -48,7 +48,7 @@ case "$case_id" in
  0005)
   test "$(cloc --version)" = 2.02
   cd "${ZION_STATS_SOURCE:?Set ZION_STATS_SOURCE to the fixed Asterinas statistics checkout}"
-  printf 'SOURCE_COMMIT=536593f341c581d430f6743cfd322c09e4e0be26\n'
+  printf 'SOURCE_COMMIT=%s\n' "$(git rev-parse HEAD)"
   python3 tools/count_unsafe_rust.py
   ;;
  0006)
@@ -63,6 +63,7 @@ case "$case_id" in
  0008)
   printf 'Physical serial must already be recording this Host boot.\n'
   ./zion-runtime.sh init
+  ./zion-runtime.sh tamper-s3 preflight
   test "$(cat /sys/module/kvm/parameters/zion_vcpu_tamper)" = 0
   printf '1\n' > /sys/module/kvm/parameters/zion_vcpu_tamper
   ./zion-runtime.sh linux
